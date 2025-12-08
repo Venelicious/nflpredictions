@@ -84,6 +84,13 @@ const teams = [
   { name: 'Seattle Seahawks', conference: 'NFC', division: 'West', league: 'NFL' },
 ];
 
+function splitTeamName(teamName) {
+  const parts = teamName.split(' ');
+  if (parts.length === 1) return { city: teamName, alias: '' };
+  const alias = parts.pop();
+  return { city: parts.join(' '), alias };
+}
+
 const auth = {
   storageKey: 'nflp_users',
   currentKey: 'nflp_current',
@@ -440,8 +447,9 @@ function renderPredictions(predictions) {
         logo.loading = 'lazy';
 
         const teamName = document.createElement('span');
-        teamName.className = 'team-name';
-        teamName.textContent = team.name;
+        teamName.className = 'team-name team-name--stacked';
+        const { city, alias } = splitTeamName(team.name);
+        teamName.innerHTML = `<span class="team-name__city">${city}</span><span class="team-name__alias">${alias}</span>`;
 
         teamArea.appendChild(rankInput);
         teamArea.appendChild(logo);
@@ -1006,85 +1014,10 @@ function renderPredictionsOverview() {
   const scoreboard = buildOverviewScoreboard(users);
   if (scoreboard) {
     elements.overviewContent.appendChild(scoreboard);
+    return;
   }
 
-  users.forEach(user => {
-    const seasonPredictions = migratePredictions(user, predictionSeason);
-    const totalPoints = calculateUserTotalPoints(seasonPredictions);
-    const card = document.createElement('div');
-    card.className = 'overview-card';
-
-    const title = document.createElement('div');
-    title.className = 'overview-card__header';
-    title.innerHTML = `
-      <div>
-        <h3>${user.name}</h3>
-        <p class="stat-meta">${user.email}${user.favorite ? ` • ${user.favorite}` : ''}</p>
-        ${typeof totalPoints === 'number' ? `<p class="stat-meta">Gesamtpunkte: ${totalPoints}</p>` : ''}
-      </div>
-    `;
-
-    const grid = document.createElement('div');
-    grid.className = 'overview-grid';
-
-    CONFERENCE_ORDER.forEach(conf => {
-      const column = document.createElement('div');
-      column.className = 'overview-column';
-      column.innerHTML = `<h4>${conf}</h4>`;
-
-      STAT_DIVISION_ORDER.forEach(div => {
-        const division = document.createElement('div');
-        division.className = 'overview-division';
-        division.innerHTML = `<h5>${div}</h5>`;
-
-        const list = document.createElement('ol');
-        list.className = 'overview-list';
-
-        const divisionTeams = teams
-          .filter(t => t.conference === conf && t.division === div)
-          .map(team => ({ team, prediction: normalizePrediction(seasonPredictions?.[team.name]) }))
-          .sort((a, b) => a.prediction.divisionRank - b.prediction.divisionRank);
-
-        const divisionBonus = standingsAvailable ? calculateDivisionBonus(divisionTeams) : null;
-
-        divisionTeams.forEach(entry => {
-          const item = document.createElement('li');
-          const teamPoints = calculateTeamPoints(entry.team.name, entry.prediction);
-          const pointsLabel =
-            typeof teamPoints === 'number' ? `${teamPoints} Punkt${teamPoints === 1 ? '' : 'e'}` : '–';
-          item.innerHTML = `
-            <div class="overview-team">
-              <span class="stat-rank">${entry.prediction.divisionRank}.</span>
-              <img src="${getTeamLogo(entry.team.name)}" alt="${entry.team.name} Logo" class="team-logo" loading="lazy" />
-              <span class="team-name">${entry.team.name}</span>
-            </div>
-            <div class="overview-meta">
-              <span class="stat-pct">${entry.prediction.wins}-${entry.prediction.losses}</span>
-              <span class="points-badge">${pointsLabel}</span>
-            </div>
-          `;
-          list.appendChild(item);
-        });
-
-        division.appendChild(list);
-        if (standingsAvailable) {
-          const bonusRow = document.createElement('div');
-          bonusRow.className = `division-bonus ${divisionBonus ? 'division-bonus--earned' : ''}`;
-          bonusRow.textContent = divisionBonus
-            ? 'Bonus: +1 Punkt für perfekte Platzierungen'
-            : 'Bonus: 0 Punkte (Platzierungen weichen ab)';
-          division.appendChild(bonusRow);
-        }
-        column.appendChild(division);
-      });
-
-      grid.appendChild(column);
-    });
-
-    card.appendChild(title);
-    card.appendChild(grid);
-    elements.overviewContent.appendChild(card);
-  });
+  elements.overviewContent.textContent = 'Aktuelle Standings fehlen für den Scoreboard-Vergleich.';
 }
 
 function buildOverviewScoreboard(users) {
@@ -1103,6 +1036,34 @@ function buildOverviewScoreboard(users) {
     <div class="hint">Punkte werden nur berechnet, wenn aktuelle Standings vorhanden sind.</div>
   `;
 
+  const columnTemplate = `repeat(${users.length + 1}, minmax(150px, 1fr))`;
+
+  wrapper.appendChild(header);
+
+  const headerRow = document.createElement('div');
+  headerRow.className = 'scoreboard__header-row scoreboard__header-row--global';
+  headerRow.style.gridTemplateColumns = columnTemplate;
+
+  const standingsHeader = document.createElement('div');
+  standingsHeader.className = 'scoreboard__cell scoreboard__cell--header';
+  standingsHeader.innerHTML = '<div class="scoreboard__player-name">Standings</div>';
+  headerRow.appendChild(standingsHeader);
+
+  users.forEach(user => {
+    const totalPoints = calculateUserTotalPoints(migratePredictions(user, predictionSeason));
+    const cell = document.createElement('div');
+    cell.className = 'scoreboard__cell scoreboard__cell--header';
+    cell.innerHTML = `
+      <div class="scoreboard__player-name">${user.name}</div>
+      <div class="scoreboard__player-points">${
+        typeof totalPoints === 'number' ? `${totalPoints} Punkte` : '–'
+      }</div>
+    `;
+    headerRow.appendChild(cell);
+  });
+
+  wrapper.appendChild(headerRow);
+
   const grid = document.createElement('div');
   grid.className = 'scoreboard-grid';
 
@@ -1112,29 +1073,6 @@ function buildOverviewScoreboard(users) {
       const scoreboard = document.createElement('div');
       scoreboard.className = 'scoreboard';
       scoreboard.innerHTML = `<div class="scoreboard__title">${conf} ${div}</div>`;
-
-      const headerRow = document.createElement('div');
-      headerRow.className = 'scoreboard__header-row';
-
-      const standingsHeader = document.createElement('div');
-      standingsHeader.className = 'scoreboard__cell scoreboard__cell--header';
-      standingsHeader.innerHTML = '<div class="scoreboard__player-name">Standings</div>';
-      headerRow.appendChild(standingsHeader);
-
-      users.forEach(user => {
-        const totalPoints = calculateUserTotalPoints(migratePredictions(user, predictionSeason));
-        const cell = document.createElement('div');
-        cell.className = 'scoreboard__cell scoreboard__cell--header';
-        cell.innerHTML = `
-          <div class="scoreboard__player-name">${user.name}</div>
-          <div class="scoreboard__player-points">${
-            typeof totalPoints === 'number' ? `${totalPoints} Punkte` : '–'
-          }</div>
-        `;
-        headerRow.appendChild(cell);
-      });
-
-      scoreboard.appendChild(headerRow);
 
       const divisionTeams = teams.filter(team => team.conference === conf && team.division === div);
 
@@ -1153,6 +1091,7 @@ function buildOverviewScoreboard(users) {
       for (let i = 0; i < maxRows; i++) {
         const row = document.createElement('div');
         row.className = 'scoreboard__row';
+        row.style.gridTemplateColumns = columnTemplate;
 
         const actualEntry = divisionStandings[i];
         const actualCell = document.createElement('div');
@@ -1187,6 +1126,7 @@ function buildOverviewScoreboard(users) {
                 <img src="${getTeamLogo(predicted.team.name)}" alt="${predicted.team.name} Logo" class="team-logo" loading="lazy" />
                 <span class="team-name">${predicted.team.name}</span>
               </div>
+              <div class="scoreboard__record">Tipp: ${predicted.prediction.wins}-${predicted.prediction.losses}</div>
               <div class="scoreboard__team-points">${pointsLabel}</div>
             `;
           } else {
@@ -1203,7 +1143,6 @@ function buildOverviewScoreboard(users) {
     });
   });
 
-  wrapper.appendChild(header);
   wrapper.appendChild(grid);
 
   return wrapper;
