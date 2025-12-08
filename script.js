@@ -325,6 +325,35 @@ function populateLockSeasonSelect() {
   updateLockDateForm();
 }
 
+function refreshCoPlayerSelect() {
+  if (!elements.coPlayerSelect) return;
+  const coPlayers = readCoPlayers();
+  const active = getActivePredictor();
+
+  elements.coPlayerSelect.innerHTML = '';
+
+  if (auth.currentUser) {
+    const currentUser = auth.getUser(auth.currentUser);
+    const userOption = document.createElement('option');
+    userOption.value = `user:${auth.currentUser}`;
+    userOption.textContent = currentUser ? `Du (${currentUser.name || currentUser.email})` : 'Eigenes Profil';
+    elements.coPlayerSelect.appendChild(userOption);
+  }
+
+  coPlayers.forEach(player => {
+    const option = document.createElement('option');
+    option.value = `co:${player.id}`;
+    option.textContent = player.name || 'Mitspieler';
+    elements.coPlayerSelect.appendChild(option);
+  });
+
+  const preferredValue = `${active.type}:${active.id}`;
+  const hasPreferred = Array.from(elements.coPlayerSelect.options).some(opt => opt.value === preferredValue);
+  elements.coPlayerSelect.value = hasPreferred
+    ? preferredValue
+    : elements.coPlayerSelect.options[0]?.value || '';
+}
+
 function showAuth(mode) {
   elements.loginForm.classList.toggle('hidden', mode !== 'login');
   elements.registerForm.classList.toggle('hidden', mode !== 'register');
@@ -350,9 +379,11 @@ function updateAuthUI() {
       elements.lockSeasonSelect.value = predictionSeason;
       updateLockDateForm();
     }
-    renderPredictions(migratePredictions(user, predictionSeason));
-    updateLockInfo();
+    setActivePredictor({ type: 'user', id: current });
+    refreshCoPlayerSelect();
+    loadPredictionsForActive();
   } else {
+    refreshCoPlayerSelect();
     updateOverviewAccess();
   }
 }
@@ -362,6 +393,57 @@ function switchTab(targetId) {
   if (targetButton?.disabled) return;
   elements.tabButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === targetId));
   elements.tabPanes.forEach(pane => pane.classList.toggle('active', pane.id === targetId));
+}
+
+function getActivePredictionOwner() {
+  const active = getActivePredictor();
+  if (active.type === 'co') {
+    const player = readCoPlayers().find(p => p.id === active.id);
+    return {
+      type: 'co',
+      name: player?.name || 'Mitspieler',
+      predictions: migrateCoPlayerPredictions(player, predictionSeason),
+      identifier: player?.id,
+    };
+  }
+
+  const user = auth.getUser(auth.currentUser);
+  return {
+    type: 'user',
+    name: user?.name || user?.email || 'Eigenes Profil',
+    predictions: migratePredictions(user, predictionSeason),
+    identifier: user?.email,
+  };
+}
+
+function handlePredictorChange(event) {
+  const value = event.target.value || '';
+  const [type, id] = value.split(':');
+  setActivePredictor({ type: type === 'co' ? 'co' : 'user', id });
+  loadPredictionsForActive();
+}
+
+function handleAddCoPlayer() {
+  const name = prompt('Wie heißt der Mitspieler?');
+  if (!name) return;
+  const coPlayers = readCoPlayers();
+  const newPlayer = {
+    id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `co-${Date.now()}`,
+    name: name.trim(),
+    predictionsBySeason: { [predictionSeason]: defaultPredictions() },
+  };
+  saveCoPlayers([...coPlayers, newPlayer]);
+  setActivePredictor({ type: 'co', id: newPlayer.id });
+  refreshCoPlayerSelect();
+  loadPredictionsForActive();
+  elements.predictionStatus.textContent = `${newPlayer.name} wurde angelegt. Du bearbeitest jetzt seine Tipps.`;
+}
+
+function loadPredictionsForActive() {
+  const owner = getActivePredictionOwner();
+  renderPredictions(owner.predictions);
+  elements.predictionStatus.textContent = `Tipps für ${owner.name}`;
+  updateLockInfo();
 }
 
 function renderPredictions(predictions) {
@@ -515,12 +597,12 @@ function calculateUserTotalPoints(predictions) {
 }
 
 function handlePredictionChange(event) {
-  const current = auth.getUser(auth.currentUser);
-  if (!current) return;
+  const owner = getActivePredictionOwner();
+  if (!owner) return;
   const team = event.target.dataset.team;
   const field = event.target.dataset.field;
   const rawValue = parseInt(event.target.value, 10);
-  const predictions = migratePredictions(current, predictionSeason);
+  const predictions = owner.predictions;
   const prediction = normalizePrediction(predictions[team]);
 
   if (field === 'divisionRank') {
@@ -534,7 +616,16 @@ function handlePredictionChange(event) {
   predictions[team] = prediction;
   event.target.value = prediction[field];
   highlightConflicts(predictions);
-  auth.updatePredictions(current.email, predictions, predictionSeason);
+  if (owner.type === 'co') {
+    const updated = readCoPlayers().map(player => {
+      if (player.id !== owner.identifier) return player;
+      const predictionsBySeason = { ...(player.predictionsBySeason || {}), [predictionSeason]: predictions };
+      return { ...player, predictionsBySeason };
+    });
+    saveCoPlayers(updated);
+  } else if (owner.identifier) {
+    auth.updatePredictions(owner.identifier, predictions, predictionSeason);
+  }
   updateSaveState('Änderungen werden automatisch zwischengespeichert.');
 }
 
@@ -615,10 +706,7 @@ function handleSeasonChange(event) {
   predictionSeason = event.target.value;
   localStorage.setItem(PREDICTION_SEASON_KEY, predictionSeason);
 
-  const current = auth.getUser(auth.currentUser);
-  if (current) {
-    renderPredictions(migratePredictions(current, predictionSeason));
-  }
+  loadPredictionsForActive();
   updateSaveState();
   if (elements.lockSeasonSelect) {
     elements.lockSeasonSelect.value = predictionSeason;
@@ -634,8 +722,8 @@ function isLocked() {
 }
 
 function savePredictions() {
-  const user = auth.getUser(auth.currentUser);
-  if (!user) return;
+  const owner = getActivePredictionOwner();
+  if (!owner) return;
   const predictions = {};
   const divisionCounts = {};
   let hasConflict = false;
@@ -679,8 +767,18 @@ function savePredictions() {
     return;
   }
 
-  auth.updatePredictions(user.email, predictions, predictionSeason);
-  elements.predictionStatus.textContent = 'Tipps gespeichert!';
+  if (owner.type === 'co') {
+    const updated = readCoPlayers().map(player => {
+      if (player.id !== owner.identifier) return player;
+      const predictionsBySeason = { ...(player.predictionsBySeason || {}), [predictionSeason]: predictions };
+      return { ...player, predictionsBySeason };
+    });
+    saveCoPlayers(updated);
+    elements.predictionStatus.textContent = 'Tipps des Mitspielers gespeichert!';
+  } else {
+    auth.updatePredictions(owner.identifier, predictions, predictionSeason);
+    elements.predictionStatus.textContent = 'Tipps gespeichert!';
+  }
   elements.predictionStatus.className = 'status success';
 }
 
@@ -855,6 +953,19 @@ async function loadStats(season = predictionSeason) {
   }
 }
 
+function getParticipantPredictions(participant) {
+  if (participant?.email) {
+    return migratePredictions(participant, predictionSeason);
+  }
+  return migrateCoPlayerPredictions(participant, predictionSeason);
+}
+
+function listParticipants() {
+  const users = auth.users || [];
+  const coPlayers = readCoPlayers();
+  return [...users, ...coPlayers];
+}
+
 function renderPredictionsOverview() {
   const locked = isLocked();
   elements.overviewContent.innerHTML = '';
@@ -865,13 +976,13 @@ function renderPredictionsOverview() {
     return;
   }
 
-  const users = auth.users;
-  if (!users.length) {
+  const participants = listParticipants();
+  if (!participants.length) {
     elements.overviewContent.textContent = 'Noch keine Benutzer vorhanden.';
     return;
   }
 
-  const scoreboard = buildOverviewScoreboard(users);
+  const scoreboard = buildOverviewScoreboard(participants);
   if (scoreboard) {
     elements.overviewContent.appendChild(scoreboard);
     return;
@@ -880,7 +991,7 @@ function renderPredictionsOverview() {
   elements.overviewContent.textContent = 'Aktuelle Standings fehlen für den Scoreboard-Vergleich.';
 }
 
-function buildOverviewScoreboard(users) {
+function buildOverviewScoreboard(participants) {
   if (!standingsSnapshot) return null;
 
   const wrapper = document.createElement('div');
@@ -896,7 +1007,7 @@ function buildOverviewScoreboard(users) {
     <div class="hint">Punkte werden nur berechnet, wenn aktuelle Standings vorhanden sind.</div>
   `;
 
-  const columnTemplate = `repeat(${users.length + 1}, minmax(150px, 1fr))`;
+  const columnTemplate = `repeat(${participants.length + 1}, minmax(150px, 1fr))`;
 
   wrapper.appendChild(header);
 
@@ -909,12 +1020,12 @@ function buildOverviewScoreboard(users) {
   standingsHeader.innerHTML = '<div class="scoreboard__player-name">Standings</div>';
   headerRow.appendChild(standingsHeader);
 
-  users.forEach(user => {
-    const totalPoints = calculateUserTotalPoints(migratePredictions(user, predictionSeason));
+  participants.forEach(player => {
+    const totalPoints = calculateUserTotalPoints(getParticipantPredictions(player));
     const cell = document.createElement('div');
     cell.className = 'scoreboard__cell scoreboard__cell--header';
     cell.innerHTML = `
-      <div class="scoreboard__player-name">${user.name}</div>
+      <div class="scoreboard__player-name">${player.name}</div>
       <div class="scoreboard__player-points">${
         typeof totalPoints === 'number' ? `${totalPoints} Punkte` : '–'
       }</div>
@@ -936,8 +1047,8 @@ function buildOverviewScoreboard(users) {
 
       const divisionTeams = teams.filter(team => team.conference === conf && team.division === div);
 
-      const userDivisionPredictions = users.map(user => {
-        const predictions = migratePredictions(user, predictionSeason);
+      const userDivisionPredictions = participants.map(user => {
+        const predictions = getParticipantPredictions(user);
         return {
           user,
           entries: divisionTeams
@@ -1059,11 +1170,18 @@ function setupEvents() {
   elements.startNow.addEventListener('click', () => showAuth('register'));
   elements.registerForm.addEventListener('submit', handleRegister);
   elements.loginForm.addEventListener('submit', handleLogin);
-  elements.logoutBtn.addEventListener('click', () => { auth.logout(); updateAuthUI(); showAuth('login'); });
+  elements.logoutBtn.addEventListener('click', () => {
+    auth.logout();
+    setActivePredictor({ type: 'user', id: '' });
+    updateAuthUI();
+    showAuth('login');
+  });
   elements.profileForm.addEventListener('submit', handleProfileSubmit);
   elements.savePredictions.addEventListener('click', savePredictions);
   elements.lockSeasonSelect?.addEventListener('change', updateLockDateForm);
   elements.saveLockDate?.addEventListener('click', handleLockDateSave);
+  elements.coPlayerSelect?.addEventListener('change', handlePredictorChange);
+  elements.addCoPlayer?.addEventListener('click', handleAddCoPlayer);
   elements.tabButtons.forEach(btn =>
     btn.addEventListener('click', () => {
       if (btn.disabled) return;
