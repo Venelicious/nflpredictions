@@ -658,6 +658,54 @@ button { font-family: inherit; }
   gap: 4px;
 }
 
+.scoreboard__cell--info {
+  background: #f1f5f9;
+  color: var(--muted);
+  text-align: center;
+}
+
+.scoreboard__bonus-row {
+  background: transparent;
+}
+
+.scoreboard__cell--bonus {
+  text-align: center;
+  align-content: center;
+}
+
+.bonus-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px dashed var(--border);
+  color: var(--muted);
+  background: #fff;
+  font-weight: 700;
+}
+
+.bonus-chip--active {
+  border-color: var(--success);
+  color: var(--success);
+  background: rgba(15, 157, 88, 0.08);
+  box-shadow: 0 6px 12px rgba(15, 157, 88, 0.15);
+}
+
+.bonus-chip__caption {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.scoreboard__bonus-label {
+  font-weight: 800;
+}
+
+.scoreboard__bonus-hint {
+  font-size: 12px;
+  color: var(--muted);
+}
+
 footer {
   text-align: center;
   color: var(--muted);
