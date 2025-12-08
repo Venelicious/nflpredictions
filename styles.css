@@ -418,6 +418,23 @@ button { font-family: inherit; }
   max-width: 220px;
 }
 
+.team-name--stacked {
+  display: inline-flex;
+  flex-direction: column;
+  line-height: 1.2;
+  white-space: normal;
+  max-width: 160px;
+}
+
+.team-name__city {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.team-name__alias {
+  font-weight: 700;
+}
+
 .stat-rank { font-weight: 700; color: var(--accent); }
 .stat-row__record { display: flex; align-items: center; gap: 8px; }
 .stat-pct { color: var(--muted); }
@@ -527,7 +544,7 @@ button { font-family: inherit; }
 
 .scoreboard-grid {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .scoreboard {
@@ -538,7 +555,7 @@ button { font-family: inherit; }
 
 .scoreboard__title {
   margin: 0;
-  padding: 10px 12px;
+  padding: 8px 10px;
   font-weight: 800;
   color: var(--muted);
   border-bottom: 1px solid var(--border);
@@ -547,10 +564,18 @@ button { font-family: inherit; }
 .scoreboard__row,
 .scoreboard__header-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 8px;
-  padding: 10px 12px;
+  grid-template-columns: var(--scoreboard-columns, repeat(auto-fit, minmax(150px, 1fr)));
+  gap: 6px;
+  padding: 8px 10px;
   align-items: stretch;
+}
+
+.scoreboard__header-row--global {
+  margin-bottom: 10px;
+}
+
+.scoreboard__header-row--global .scoreboard__cell {
+  background: #eef2ff;
 }
 
 .scoreboard__row:nth-child(even) {
@@ -560,7 +585,7 @@ button { font-family: inherit; }
 .scoreboard__cell {
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 8px;
+  padding: 6px;
   background: #fff;
   display: grid;
   gap: 6px;
