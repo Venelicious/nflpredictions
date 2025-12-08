@@ -38,6 +38,7 @@
         <button class="tab-button active" data-tab="profileTab">Profil</button>
         <button class="tab-button" data-tab="predictionsTab">Tipps</button>
         <button class="tab-button" data-tab="statsTab">NFL Stats</button>
+        <button class="tab-button" data-tab="importTab">CSV-Import</button>
         <button class="tab-button" data-tab="overviewTab">Tipps-Übersicht</button>
       </nav>
 
@@ -133,13 +134,12 @@
           <div id="statsContent" class="card">Starte eine Aktualisierung…</div>
         </section>
 
-        <section id="overviewTab" class="tab-pane">
+        <section id="importTab" class="tab-pane">
           <div class="pane-header">
-            <h2>Vorhersagen aller Benutzer</h2>
-            <p id="overviewStatus" class="hint"></p>
+            <h2>Ranking-Tabelle importieren</h2>
+            <p class="hint">Füge die Tabelle aus CSV oder Excel ein, um mehrere Mitspieler auf einmal zu übernehmen.</p>
           </div>
           <div class="card import-card">
-            <h3>Ranking-Tabelle importieren</h3>
             <p class="hint">
               Kopiere die Tabelle (CSV oder aus Excel heraus) und füge sie hier ein. Erste Spalte: Teamname.
               Ab der zweiten Spalte die Werte für jeden Mitspieler im Format <strong>Platz (Siege-Niederlagen)</strong>,
@@ -150,6 +150,13 @@
               <button id="importTableBtn" type="button" class="secondary">Tabelle übernehmen</button>
               <p id="importStatus" class="status"></p>
             </div>
+          </div>
+        </section>
+
+        <section id="overviewTab" class="tab-pane">
+          <div class="pane-header">
+            <h2>Vorhersagen aller Benutzer</h2>
+            <p id="overviewStatus" class="hint"></p>
           </div>
           <div id="overviewContent" class="card"></div>
         </section>
