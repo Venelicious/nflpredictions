@@ -197,6 +197,7 @@ const elements = {
   authArea: document.getElementById('authArea'),
   coPlayerSelect: document.getElementById('coPlayerSelect'),
   addCoPlayer: document.getElementById('addCoPlayer'),
+  editCoPlayer: document.getElementById('editCoPlayer'),
   deleteCoPlayer: document.getElementById('deleteCoPlayer'),
   statsContent: document.getElementById('statsContent'),
   refreshStats: document.getElementById('refreshStats'),
@@ -359,7 +360,9 @@ function parseTableInput(text) {
     throw new Error('Die Kopfzeile benötigt mindestens einen Spielernamen.');
   }
 
-  const playerNames = header.slice(1).map(name => name || 'Mitspieler');
+  const playerNames = header
+    .slice(1)
+    .map(name => (name || '').trim() || 'Mitspieler');
   const rows = lines.slice(1).map(line => line.split(delimiter).map(cell => cell.trim()));
 
   return { playerNames, rows };
@@ -371,20 +374,19 @@ function importTableData(raw) {
   const playerMap = new Map();
 
   playerNames.forEach(name => {
-    const current = existing.find(p => p.name === name);
-    const fallbackPredictions = current
-      ? migrateCoPlayerPredictions(current, predictionSeason)
-      : defaultPredictions();
+    const normalizedName = name.trim();
+    const playerKey = normalizedName.toLowerCase();
+    const current = existing.find(p => (p.name || '').toLowerCase() === playerKey);
     const predictionsBySeason = {
       ...(current?.predictionsBySeason || {}),
-      [predictionSeason]: { ...fallbackPredictions },
+      [predictionSeason]: defaultPredictions(),
     };
 
-    playerMap.set(name, {
+    playerMap.set(playerKey, {
       id:
         current?.id ||
         (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `co-${Date.now()}-${Math.random()}`),
-      name,
+      name: normalizedName,
       predictionsBySeason,
     });
   });
@@ -404,15 +406,16 @@ function importTableData(raw) {
       const parsed = parsePredictionCell(cell);
       if (!parsed) return;
 
-      const entry = playerMap.get(playerName);
+      const playerKey = playerName.toLowerCase();
+      const entry = playerMap.get(playerKey);
       const seasonPredictions = entry.predictionsBySeason[predictionSeason] || defaultPredictions();
       entry.predictionsBySeason[predictionSeason] = { ...seasonPredictions, [teamName]: parsed };
-      playerMap.set(playerName, entry);
+      playerMap.set(playerKey, entry);
     });
   });
 
   const updatedPlayers = existing
-    .filter(player => !playerMap.has(player.name))
+    .filter(player => !playerMap.has((player.name || '').toLowerCase()))
     .concat(Array.from(playerMap.values()));
 
   saveCoPlayers(updatedPlayers);
@@ -603,6 +606,39 @@ function handleAddCoPlayer() {
   refreshCoPlayerSelect();
   loadPredictionsForActive();
   elements.predictionStatus.textContent = `${newPlayer.name} wurde angelegt. Du bearbeitest jetzt seine Tipps.`;
+}
+
+function handleEditCoPlayer() {
+  if (!elements.coPlayerSelect) return;
+  const [type, id] = (elements.coPlayerSelect.value || '').split(':');
+  if (type !== 'co') {
+    elements.predictionStatus.textContent = 'Bitte zuerst einen Mitspieler auswählen.';
+    elements.predictionStatus.className = 'status error';
+    return;
+  }
+
+  const coPlayers = readCoPlayers();
+  const player = coPlayers.find(p => p.id === id);
+  if (!player) return;
+
+  const newName = prompt('Neuer Name für den Mitspieler:', player.name || '');
+  if (!newName) return;
+
+  const trimmedName = newName.trim();
+  if (!trimmedName) return;
+
+  const updated = coPlayers.map(p => (p.id === id ? { ...p, name: trimmedName } : p));
+  saveCoPlayers(updated);
+
+  const active = getActivePredictor();
+  if (active.type === 'co' && active.id === id) {
+    setActivePredictor({ type: 'co', id });
+  }
+
+  refreshCoPlayerSelect();
+  loadPredictionsForActive();
+  elements.predictionStatus.textContent = `${trimmedName} wurde umbenannt.`;
+  elements.predictionStatus.className = 'status success';
 }
 
 function handleDeleteCoPlayer() {
@@ -1405,6 +1441,7 @@ function setupEvents() {
   elements.saveLockDate?.addEventListener('click', handleLockDateSave);
   elements.coPlayerSelect?.addEventListener('change', handlePredictorChange);
   elements.addCoPlayer?.addEventListener('click', handleAddCoPlayer);
+  elements.editCoPlayer?.addEventListener('click', handleEditCoPlayer);
   elements.deleteCoPlayer?.addEventListener('click', handleDeleteCoPlayer);
   elements.tabButtons.forEach(btn =>
     btn.addEventListener('click', () => {
