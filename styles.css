@@ -188,6 +188,34 @@ button.cta {
   min-width: 180px;
 }
 
+.coplayer-picker {
+  display: grid;
+  gap: 4px;
+  min-width: 280px;
+}
+
+.coplayer-picker__header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.coplayer-picker__label {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.coplayer-picker__controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.coplayer-picker select {
+  min-width: 220px;
+}
+
 .tab-button {
   flex: 1;
   padding: 12px;

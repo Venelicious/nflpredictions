@@ -46,6 +46,16 @@
           Saison:
           <select id="seasonPicker"></select>
         </label>
+        <div class="coplayer-picker">
+          <div class="coplayer-picker__header">
+            <span class="coplayer-picker__label">Mitspieler</span>
+            <p class="hint">Wähle, wessen Tipps du bearbeiten möchtest.</p>
+          </div>
+          <div class="coplayer-picker__controls">
+            <select id="coPlayerSelect"></select>
+            <button id="addCoPlayer" type="button" class="secondary">Mitspieler hinzufügen</button>
+          </div>
+        </div>
         <p class="hint">Gilt für Tipps, Stats und Übersicht.</p>
       </div>
 
