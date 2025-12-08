@@ -706,6 +706,22 @@ button { font-family: inherit; }
   color: var(--muted);
 }
 
+.import-card textarea {
+  width: 100%;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #f8fafc;
+}
+
+.import-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 footer {
   text-align: center;
   color: var(--muted);

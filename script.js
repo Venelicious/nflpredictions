@@ -92,6 +92,19 @@ function splitTeamName(teamName) {
   return { city: parts.join(' '), alias };
 }
 
+function normalizeTeamKey(label = '') {
+  return label
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+const teamNameLookup = teams.reduce((acc, team) => {
+  acc[normalizeTeamKey(team.name)] = team.name;
+  return acc;
+}, {});
+
 const auth = {
   storageKey: 'nflp_users',
   currentKey: 'nflp_current',
@@ -188,6 +201,9 @@ const elements = {
   refreshStats: document.getElementById('refreshStats'),
   overviewContent: document.getElementById('overviewContent'),
   overviewStatus: document.getElementById('overviewStatus'),
+  tableImport: document.getElementById('tableImport'),
+  importStatus: document.getElementById('importStatus'),
+  importTableBtn: document.getElementById('importTableBtn'),
   lockSeasonSelect: document.getElementById('lockSeasonSelect'),
   lockDateInput: document.getElementById('lockDateInput'),
   lockDateStatus: document.getElementById('lockDateStatus'),
@@ -301,6 +317,108 @@ function normalizePrediction(prediction = {}) {
     wins: clamp(Number(prediction.wins) || 0, 0, 17),
     losses: clamp(Number(prediction.losses) || 0, 0, 17),
   };
+}
+
+function detectDelimiter(line) {
+  if (line.includes(';')) return ';';
+  if (line.includes('\t')) return '\t';
+  return ',';
+}
+
+function parsePredictionCell(cell) {
+  const normalized = cell || '';
+  const match = normalized.match(/(\d+)\D+(\d+)\s*-\s*(\d+)/);
+  if (!match) return null;
+  return normalizePrediction({
+    divisionRank: Number(match[1]),
+    wins: Number(match[2]),
+    losses: Number(match[3]),
+  });
+}
+
+function findTeamByLabel(label = '') {
+  const key = normalizeTeamKey(label);
+  return teamNameLookup[key] || null;
+}
+
+function parseTableInput(text) {
+  const lines = text
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean);
+
+  if (lines.length < 2) {
+    throw new Error('Mindestens Kopfzeile und eine Datenzeile einfügen.');
+  }
+
+  const delimiter = detectDelimiter(lines[0]);
+  const header = lines[0].split(delimiter).map(cell => cell.trim());
+
+  if (header.length < 2) {
+    throw new Error('Die Kopfzeile benötigt mindestens einen Spielernamen.');
+  }
+
+  const playerNames = header.slice(1).map(name => name || 'Mitspieler');
+  const rows = lines.slice(1).map(line => line.split(delimiter).map(cell => cell.trim()));
+
+  return { playerNames, rows };
+}
+
+function importTableData(raw) {
+  const { playerNames, rows } = parseTableInput(raw);
+  const existing = readCoPlayers();
+  const playerMap = new Map();
+
+  playerNames.forEach(name => {
+    const current = existing.find(p => p.name === name);
+    const fallbackPredictions = current
+      ? migrateCoPlayerPredictions(current, predictionSeason)
+      : defaultPredictions();
+    const predictionsBySeason = {
+      ...(current?.predictionsBySeason || {}),
+      [predictionSeason]: { ...fallbackPredictions },
+    };
+
+    playerMap.set(name, {
+      id:
+        current?.id ||
+        (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `co-${Date.now()}-${Math.random()}`),
+      name,
+      predictionsBySeason,
+    });
+  });
+
+  const skippedTeams = [];
+
+  rows.forEach(cells => {
+    const [teamCell, ...values] = cells;
+    const teamName = findTeamByLabel(teamCell);
+    if (!teamName) {
+      skippedTeams.push(teamCell || '');
+      return;
+    }
+
+    playerNames.forEach((playerName, idx) => {
+      const cell = values[idx] || '';
+      const parsed = parsePredictionCell(cell);
+      if (!parsed) return;
+
+      const entry = playerMap.get(playerName);
+      const seasonPredictions = entry.predictionsBySeason[predictionSeason] || defaultPredictions();
+      entry.predictionsBySeason[predictionSeason] = { ...seasonPredictions, [teamName]: parsed };
+      playerMap.set(playerName, entry);
+    });
+  });
+
+  const updatedPlayers = existing
+    .filter(player => !playerMap.has(player.name))
+    .concat(Array.from(playerMap.values()));
+
+  saveCoPlayers(updatedPlayers);
+  refreshCoPlayerSelect();
+  renderPredictionsOverview();
+
+  return { playerNames, skippedTeams, newPlayers: Array.from(playerMap.values()) };
 }
 
 function sortTeams() {
@@ -1211,6 +1329,30 @@ function updateOverviewAccess() {
   renderPredictionsOverview();
 }
 
+function handleTableImport() {
+  if (!elements.tableImport || !elements.importStatus) return;
+  const raw = elements.tableImport.value.trim();
+  if (!raw) {
+    elements.importStatus.textContent = 'Bitte füge die Tabelle ein.';
+    return;
+  }
+
+  try {
+    const { playerNames, skippedTeams, newPlayers } = importTableData(raw);
+    elements.importStatus.textContent = `Import abgeschlossen. ${playerNames.length} Spieler übernommen.`;
+    if (skippedTeams.length) {
+      elements.importStatus.textContent += ` Übersprungene Teams: ${[...new Set(skippedTeams)].join(', ')}.`;
+    }
+
+    if (newPlayers.length) {
+      setActivePredictor({ type: 'co', id: newPlayers[0].id });
+      loadPredictionsForActive();
+    }
+  } catch (err) {
+    elements.importStatus.textContent = err.message || 'Import fehlgeschlagen.';
+  }
+}
+
 function setupEvents() {
   elements.showRegister.addEventListener('click', () => showAuth('register'));
   elements.showLogin.addEventListener('click', () => showAuth('login'));
@@ -1237,6 +1379,7 @@ function setupEvents() {
   );
   elements.refreshStats.addEventListener('click', loadStats);
   elements.seasonPicker?.addEventListener('change', handleSeasonChange);
+  elements.importTableBtn?.addEventListener('click', handleTableImport);
 }
 
 function init() {

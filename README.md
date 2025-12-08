@@ -136,6 +136,19 @@
             <h2>Vorhersagen aller Benutzer</h2>
             <p id="overviewStatus" class="hint"></p>
           </div>
+          <div class="card import-card">
+            <h3>Ranking-Tabelle importieren</h3>
+            <p class="hint">
+              Kopiere die Tabelle (CSV oder aus Excel heraus) und füge sie hier ein. Erste Spalte: Teamname.
+              Ab der zweiten Spalte die Werte für jeden Mitspieler im Format <strong>Platz (Siege-Niederlagen)</strong>,
+              z. B. <code>2 (13-4)</code>.
+            </p>
+            <textarea id="tableImport" rows="6" placeholder="Team;Raul;Birk;...&#10;Buffalo Bills;2 (13-4);2 (13-4);..."></textarea>
+            <div class="import-actions">
+              <button id="importTableBtn" type="button" class="secondary">Tabelle übernehmen</button>
+              <p id="importStatus" class="status"></p>
+            </div>
+          </div>
           <div id="overviewContent" class="card"></div>
         </section>
       </div>
