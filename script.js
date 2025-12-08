@@ -2,6 +2,11 @@ const LOCK_DATE = new Date('2025-09-01T12:00:00Z');
 const CONFERENCE_ORDER = ['AFC', 'NFC'];
 const DIVISION_ORDER = ['East', 'North', 'South', 'West'];
 const STAT_DIVISION_ORDER = ['North', 'East', 'South', 'West'];
+const AVAILABLE_SEASONS = [
+  { value: '2024', label: 'Saison 2024/2025 (abgeschlossen)' },
+  { value: '2025', label: 'Saison 2025/2026' },
+];
+let selectedSeason = AVAILABLE_SEASONS[0].value;
 
 const teamLogos = {
   'Buffalo Bills': 'https://a.espncdn.com/i/teamlogos/nfl/500/buf.png',
@@ -154,6 +159,7 @@ const elements = {
   authArea: document.getElementById('authArea'),
   statsContent: document.getElementById('statsContent'),
   refreshStats: document.getElementById('refreshStats'),
+  seasonSelect: document.getElementById('seasonSelect'),
   overviewContent: document.getElementById('overviewContent'),
   overviewStatus: document.getElementById('overviewStatus'),
 };
@@ -223,6 +229,17 @@ function populateTeamSelect() {
     option.textContent = `${team.name} (${team.conference} ${team.division})`;
     elements.profileFavorite.appendChild(option);
   });
+}
+
+function populateSeasonSelect() {
+  elements.seasonSelect.innerHTML = '';
+  AVAILABLE_SEASONS.forEach(season => {
+    const option = document.createElement('option');
+    option.value = season.value;
+    option.textContent = season.label;
+    elements.seasonSelect.appendChild(option);
+  });
+  elements.seasonSelect.value = selectedSeason;
 }
 
 function showAuth(mode) {
@@ -674,13 +691,17 @@ function renderStats(data) {
   elements.statsContent.appendChild(container);
 }
 
-async function loadStats() {
-  elements.statsContent.textContent = 'Lade aktuelle Daten…';
+async function loadStats(season = selectedSeason) {
+  selectedSeason = season;
+  elements.statsContent.textContent = `Lade Daten für Saison ${season}…`;
   try {
-    const response = await fetch('https://site.api.espn.com/apis/v2/sports/football/nfl/standings');
+    const response = await fetch(
+      `https://site.api.espn.com/apis/v2/sports/football/nfl/standings?season=${season}`
+    );
     if (!response.ok) throw new Error('Fehler beim Abrufen.');
     const data = await response.json();
     renderStats(data);
+    renderPredictionsOverview();
   } catch (err) {
     elements.statsContent.textContent = 'Aktualisierung nicht möglich. Prüfe deine Verbindung.';
     console.error(err);
@@ -815,10 +836,12 @@ function setupEvents() {
     })
   );
   elements.refreshStats.addEventListener('click', loadStats);
+  elements.seasonSelect.addEventListener('change', event => loadStats(event.target.value));
 }
 
 function init() {
   populateTeamSelect();
+  populateSeasonSelect();
   showAuth('login');
   setupEvents();
   if (auth.currentUser) {
