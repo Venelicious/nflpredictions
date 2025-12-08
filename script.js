@@ -247,7 +247,7 @@ function defaultPredictions() {
     const divisionKey = `${team.conference}-${team.division}`;
     const nextRank = ((divisionCounts[divisionKey] || 0) % 4) + 1;
     divisionCounts[divisionKey] = nextRank;
-    acc[team.name] = { divisionRank: nextRank, wins: 9, losses: 8 };
+    acc[team.name] = { divisionRank: nextRank, wins: 0, losses: 0 };
     return acc;
   }, {});
 }
