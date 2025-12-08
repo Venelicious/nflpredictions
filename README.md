@@ -1,9 +1,3 @@
-# nflpredictions.github.io
-
-Der aktuelle Inhalt von `index.html`:
-
-```html
-<!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="UTF-8">
