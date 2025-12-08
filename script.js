@@ -11,6 +11,8 @@ const AVAILABLE_SEASONS = [
 ];
 const PREDICTION_SEASON_KEY = 'nflp_prediction_season';
 const LOCK_DATE_STORAGE_KEY = 'nflp_lock_dates';
+const CO_PLAYER_STORAGE_KEY = 'nflp_co_players';
+const ACTIVE_PREDICTOR_KEY = 'nflp_active_predictor';
 let predictionSeason = localStorage.getItem(PREDICTION_SEASON_KEY) || AVAILABLE_SEASONS[0].value;
 
 const teamLogos = {
@@ -180,6 +182,8 @@ const elements = {
   predictionStatus: document.getElementById('predictionStatus'),
   startNow: document.getElementById('startNow'),
   authArea: document.getElementById('authArea'),
+  coPlayerSelect: document.getElementById('coPlayerSelect'),
+  addCoPlayer: document.getElementById('addCoPlayer'),
   statsContent: document.getElementById('statsContent'),
   refreshStats: document.getElementById('refreshStats'),
   overviewContent: document.getElementById('overviewContent'),
@@ -230,6 +234,30 @@ function defaultPredictions() {
   }, {});
 }
 
+function readCoPlayers() {
+  return JSON.parse(localStorage.getItem(CO_PLAYER_STORAGE_KEY) || '[]');
+}
+
+function saveCoPlayers(list) {
+  localStorage.setItem(CO_PLAYER_STORAGE_KEY, JSON.stringify(list));
+}
+
+function getActivePredictor() {
+  const fallback = { type: 'user', id: auth.currentUser || '' };
+  try {
+    return JSON.parse(localStorage.getItem(ACTIVE_PREDICTOR_KEY)) || fallback;
+  } catch (err) {
+    console.error('Aktiver Mitspieler konnte nicht geladen werden.', err);
+    return fallback;
+  }
+}
+
+function setActivePredictor({ type = 'user', id = '' }) {
+  const normalized = { type: type === 'co' ? 'co' : 'user', id: id || '' };
+  localStorage.setItem(ACTIVE_PREDICTOR_KEY, JSON.stringify(normalized));
+  return normalized;
+}
+
 function migratePredictions(user, season = predictionSeason) {
   if (!user) return defaultPredictions();
   const predictionsBySeason = {
@@ -245,6 +273,25 @@ function migratePredictions(user, season = predictionSeason) {
   }
 
   auth.updateProfile(user.email, { predictionsBySeason });
+  return predictionsBySeason[season];
+}
+
+function migrateCoPlayerPredictions(player, season = predictionSeason) {
+  if (!player) return defaultPredictions();
+
+  const predictionsBySeason = { ...(player.predictionsBySeason || {}) };
+  if (!Object.keys(predictionsBySeason).length && player.predictions) {
+    predictionsBySeason[AVAILABLE_SEASONS[0].value] = player.predictions;
+  }
+
+  if (!predictionsBySeason[season]) {
+    predictionsBySeason[season] = defaultPredictions();
+  }
+
+  const coPlayers = readCoPlayers();
+  const updated = coPlayers.map(p => (p.id === player.id ? { ...p, predictionsBySeason } : p));
+  saveCoPlayers(updated);
+
   return predictionsBySeason[season];
 }
 
