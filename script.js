@@ -1,4 +1,4 @@
-const LOCK_DATE = new Date('2026-09-01T12:00:00Z');
+const LOCK_DATE = new Date('2025-09-01T12:00:00Z');
 const CONFERENCE_ORDER = ['AFC', 'NFC'];
 const DIVISION_ORDER = ['East', 'North', 'South', 'West'];
 const STAT_DIVISION_ORDER = ['North', 'East', 'South', 'West'];
