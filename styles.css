@@ -410,6 +410,14 @@ button { font-family: inherit; }
   gap: 8px;
 }
 
+.team-name {
+  display: inline-block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+
 .stat-rank { font-weight: 700; color: var(--accent); }
 .stat-row__record { display: flex; align-items: center; gap: 8px; }
 .stat-pct { color: var(--muted); }
@@ -498,6 +506,103 @@ button { font-family: inherit; }
   background: rgba(15, 157, 88, 0.12);
   color: var(--success);
   font-weight: 700;
+}
+
+.overview-scoreboard {
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  background: var(--panel);
+  padding: 12px;
+}
+
+.overview-scoreboard__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.scoreboard-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.scoreboard {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.scoreboard__title {
+  margin: 0;
+  padding: 10px 12px;
+  font-weight: 800;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.scoreboard__row,
+.scoreboard__header-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+  padding: 10px 12px;
+  align-items: stretch;
+}
+
+.scoreboard__row:nth-child(even) {
+  background: #eef2ff55;
+}
+
+.scoreboard__cell {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  background: #fff;
+  display: grid;
+  gap: 6px;
+}
+
+.scoreboard__cell--header {
+  background: #fff7ed;
+  text-align: center;
+}
+
+.scoreboard__player-name {
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.scoreboard__player-points {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0;
+}
+
+.scoreboard__team-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.scoreboard__rank {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.scoreboard__record,
+.scoreboard__team-points {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.scoreboard__team-points {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 footer {
