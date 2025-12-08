@@ -199,6 +199,35 @@ button.cta {
   box-shadow: var(--shadow);
 }
 
+.settings-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.form-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.form-field {
+  display: grid;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.actions--stacked {
+  display: grid;
+  gap: 8px;
+}
+
+.action-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .form-row { display: grid; gap: 6px; margin-bottom: 12px; }
 
 input, select {

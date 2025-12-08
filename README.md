@@ -43,26 +43,84 @@
 
       <div class="tab-content">
         <section id="profileTab" class="tab-pane active">
-          <h2>Profil</h2>
-          <form id="profileForm" class="card">
-            <div class="form-row">
-              <label for="profileName">Anzeigename</label>
-              <input type="text" id="profileName" required>
+          <h2>Profil &amp; Einstellungen</h2>
+          <div class="settings-grid">
+            <form id="profileForm" class="card">
+              <h3>Profil</h3>
+              <div class="form-row">
+                <label for="profileName">Anzeigename</label>
+                <input type="text" id="profileName" required>
+              </div>
+              <div class="form-row">
+                <label for="profileEmail">E-Mail</label>
+                <input type="email" id="profileEmail" disabled>
+                <p class="hint">Die E-Mail dient als Benutzerkennung und kann nicht geändert werden.</p>
+              </div>
+              <div class="form-row">
+                <label for="profileFavorite">Lieblingsteam</label>
+                <select id="profileFavorite">
+                  <option value="">-- wähle ein Team --</option>
+                </select>
+              </div>
+              <button type="submit">Profil speichern</button>
+              <p class="status" id="profileStatus"></p>
+            </form>
+
+            <div class="card">
+              <h3>Saison-Stichtage</h3>
+              <p class="hint">Speichere für jede Saison ein eigenes Datum, ab dem Tipps schreibgeschützt sind.</p>
+              <div class="form-grid">
+                <label class="form-field">
+                  Saison
+                  <select id="lockSeasonSelect"></select>
+                </label>
+                <label class="form-field">
+                  Stichtag (Datum &amp; Uhrzeit)
+                  <input type="datetime-local" id="lockDateInput">
+                </label>
+              </div>
+              <button id="saveLockDate" type="button">Stichtag speichern</button>
+              <p class="status" id="lockDateStatus"></p>
             </div>
-            <div class="form-row">
-              <label for="profileEmail">E-Mail</label>
-              <input type="email" id="profileEmail" disabled>
-              <p class="hint">Die E-Mail dient als Benutzerkennung und kann nicht geändert werden.</p>
+
+            <div class="card">
+              <h3>GitHub Sync (optionale Cloud-Datenbank)</h3>
+              <p class="hint">
+                Hinterlege ein privates Repository, um Benutzerkonten und Stichtage als JSON zu sichern und von jedem
+                Gerät zu laden. Für Schreibzugriff wird ein Personal Access Token mit dem Recht <code>repo</code> benötigt.
+              </p>
+              <div class="form-grid">
+                <label class="form-field">
+                  Besitzer / Organisation
+                  <input type="text" id="githubOwner" placeholder="z. B. dein GitHub-Benutzername">
+                </label>
+                <label class="form-field">
+                  Repository
+                  <input type="text" id="githubRepo" placeholder="z. B. nflpredictions-db">
+                </label>
+                <label class="form-field">
+                  Branch
+                  <input type="text" id="githubBranch" value="main">
+                </label>
+                <label class="form-field">
+                  Pfad zur JSON-Datei
+                  <input type="text" id="githubFile" value="data/nflpredictions.json">
+                </label>
+                <label class="form-field">
+                  Personal Access Token (wird lokal gespeichert)
+                  <input type="password" id="githubToken" autocomplete="off">
+                </label>
+              </div>
+              <div class="actions actions--stacked">
+                <button id="githubSaveConfig" type="button">Konfiguration speichern</button>
+                <div class="action-row">
+                  <button id="githubPull" type="button" class="secondary">Aus GitHub laden</button>
+                  <button id="githubPush" type="button">Nach GitHub hochladen</button>
+                </div>
+              </div>
+              <p class="status" id="githubStatus"></p>
             </div>
-            <div class="form-row">
-              <label for="profileFavorite">Lieblingsteam</label>
-              <select id="profileFavorite">
-                <option value="">-- wähle ein Team --</option>
-              </select>
-            </div>
-            <button type="submit">Profil speichern</button>
-            <p class="status" id="profileStatus"></p>
-          </form>
+          </div>
         </section>
 
         <section id="predictionsTab" class="tab-pane">
@@ -121,10 +179,9 @@
   </main>
 
   <footer>
-    <p>Keine externe Datenbank nötig – alles bleibt lokal in deinem Browser.</p>
+    <p>Deine Daten bleiben lokal gespeichert; optional kannst du eine gesicherte JSON-Datenbank in deinem GitHub-Repo verwenden.</p>
   </footer>
 
   <script src="script.js"></script>
 </body>
 </html>
-```

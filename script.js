@@ -1,4 +1,7 @@
-const LOCK_DATE = new Date('2025-09-01T12:00:00Z');
+const DEFAULT_LOCK_DATES = {
+  '2024': '2024-09-01T12:00:00Z',
+  '2025': '2025-09-01T12:00:00Z',
+};
 const CONFERENCE_ORDER = ['AFC', 'NFC'];
 const DIVISION_ORDER = ['East', 'North', 'South', 'West'];
 const STAT_DIVISION_ORDER = ['North', 'East', 'South', 'West'];
@@ -8,6 +11,8 @@ const AVAILABLE_SEASONS = [
 ];
 let selectedSeason = AVAILABLE_SEASONS[0].value;
 const PREDICTION_SEASON_KEY = 'nflp_prediction_season';
+const LOCK_DATE_STORAGE_KEY = 'nflp_lock_dates';
+const GITHUB_CONFIG_KEY = 'nflp_github_sync';
 let predictionSeason = localStorage.getItem(PREDICTION_SEASON_KEY) || AVAILABLE_SEASONS[0].value;
 
 const teamLogos = {
@@ -145,6 +150,29 @@ const auth = {
   }
 };
 
+const githubSync = {
+  get config() {
+    return JSON.parse(localStorage.getItem(GITHUB_CONFIG_KEY) || '{}');
+  },
+  save(config) {
+    localStorage.setItem(GITHUB_CONFIG_KEY, JSON.stringify(config));
+  },
+  setStatus(message, type = 'info') {
+    if (!elements.githubStatus) return;
+    elements.githubStatus.textContent = message;
+    elements.githubStatus.className = `status ${type === 'error' ? 'error' : type === 'success' ? 'success' : ''}`;
+  },
+  applyConfigToForm() {
+    const cfg = this.config;
+    if (!elements.githubOwner) return;
+    elements.githubOwner.value = cfg.owner || '';
+    elements.githubRepo.value = cfg.repo || '';
+    elements.githubBranch.value = cfg.branch || 'main';
+    elements.githubFile.value = cfg.file || 'data/nflpredictions.json';
+    elements.githubToken.value = cfg.token || '';
+  },
+};
+
 const elements = {
   loginForm: document.getElementById('loginForm'),
   registerForm: document.getElementById('registerForm'),
@@ -175,10 +203,48 @@ const elements = {
   seasonSelect: document.getElementById('seasonSelect'),
   overviewContent: document.getElementById('overviewContent'),
   overviewStatus: document.getElementById('overviewStatus'),
+  lockSeasonSelect: document.getElementById('lockSeasonSelect'),
+  lockDateInput: document.getElementById('lockDateInput'),
+  lockDateStatus: document.getElementById('lockDateStatus'),
+  saveLockDate: document.getElementById('saveLockDate'),
+  githubOwner: document.getElementById('githubOwner'),
+  githubRepo: document.getElementById('githubRepo'),
+  githubBranch: document.getElementById('githubBranch'),
+  githubFile: document.getElementById('githubFile'),
+  githubToken: document.getElementById('githubToken'),
+  githubSaveConfig: document.getElementById('githubSaveConfig'),
+  githubPull: document.getElementById('githubPull'),
+  githubPush: document.getElementById('githubPush'),
+  githubStatus: document.getElementById('githubStatus'),
 };
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
+}
+
+function getLockDates() {
+  const stored = JSON.parse(localStorage.getItem(LOCK_DATE_STORAGE_KEY) || '{}');
+  return { ...DEFAULT_LOCK_DATES, ...stored };
+}
+
+function saveLockDates(lockDates) {
+  localStorage.setItem(LOCK_DATE_STORAGE_KEY, JSON.stringify(lockDates));
+}
+
+function getLockDateForSeason(season = predictionSeason) {
+  const lockDates = getLockDates();
+  const value = lockDates[season] || DEFAULT_LOCK_DATES[season] || DEFAULT_LOCK_DATES[AVAILABLE_SEASONS[0].value];
+  return new Date(value);
+}
+
+function formatLockDateForInput(date) {
+  const pad = num => String(num).padStart(2, '0');
+  const year = date.getFullYear();
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  const hours = pad(date.getHours());
+  const minutes = pad(date.getMinutes());
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
 function defaultPredictions() {
@@ -284,6 +350,19 @@ function populatePredictionSeasonSelect() {
   elements.predictionSeasonSelect.value = predictionSeason;
 }
 
+function populateLockSeasonSelect() {
+  if (!elements.lockSeasonSelect) return;
+  elements.lockSeasonSelect.innerHTML = '';
+  AVAILABLE_SEASONS.forEach(season => {
+    const option = document.createElement('option');
+    option.value = season.value;
+    option.textContent = season.label;
+    elements.lockSeasonSelect.appendChild(option);
+  });
+  elements.lockSeasonSelect.value = predictionSeason;
+  updateLockDateForm();
+}
+
 function showAuth(mode) {
   elements.loginForm.classList.toggle('hidden', mode !== 'login');
   elements.registerForm.classList.toggle('hidden', mode !== 'register');
@@ -303,6 +382,10 @@ function updateAuthUI() {
     elements.profileEmail.value = user?.email || '';
     elements.profileFavorite.value = user?.favorite || '';
     elements.predictionSeasonSelect.value = predictionSeason;
+    if (elements.lockSeasonSelect) {
+      elements.lockSeasonSelect.value = predictionSeason;
+      updateLockDateForm();
+    }
     renderPredictions(migratePredictions(user, predictionSeason));
     updateLockInfo();
   } else {
@@ -508,6 +591,113 @@ function highlightConflicts(predictions) {
   });
 }
 
+function toBase64(str) {
+  return btoa(unescape(encodeURIComponent(str)));
+}
+
+function fromBase64(str) {
+  return decodeURIComponent(escape(atob(str)));
+}
+
+function collectGithubConfig() {
+  return {
+    owner: elements.githubOwner?.value?.trim(),
+    repo: elements.githubRepo?.value?.trim(),
+    branch: elements.githubBranch?.value?.trim() || 'main',
+    file: elements.githubFile?.value?.trim() || 'data/nflpredictions.json',
+    token: elements.githubToken?.value?.trim(),
+  };
+}
+
+function githubHeaders(token) {
+  const headers = { Accept: 'application/vnd.github+json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+}
+
+async function fetchGithubFile(config) {
+  const url = `https://api.github.com/repos/${config.owner}/${config.repo}/contents/${config.file}?ref=${config.branch}`;
+  const response = await fetch(url, { headers: githubHeaders(config.token) });
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error('GitHub antwortet nicht wie erwartet.');
+  return response.json();
+}
+
+async function pullFromGithub() {
+  const config = collectGithubConfig();
+  if (!config.owner || !config.repo || !config.file) {
+    githubSync.setStatus('Bitte Owner, Repository und Dateipfad ausfüllen.', 'error');
+    return;
+  }
+
+  githubSync.save(config);
+  githubSync.setStatus('Lade Datenbank aus GitHub…');
+  try {
+    const file = await fetchGithubFile(config);
+    if (!file?.content) {
+      githubSync.setStatus('Noch keine Datenbank gefunden. Lege die Datei zuerst an.', 'error');
+      return;
+    }
+
+    const decoded = JSON.parse(fromBase64(file.content));
+    if (decoded.users) auth.users = decoded.users;
+    if (decoded.lockDates) saveLockDates(decoded.lockDates);
+    githubSync.setStatus('Datenbank geladen. Lokale Daten wurden aktualisiert.', 'success');
+
+    updateLockDateForm();
+    updateLockInfo();
+    const current = auth.getUser(auth.currentUser);
+    if (current) renderPredictions(migratePredictions(current, predictionSeason));
+    updateAuthUI();
+  } catch (err) {
+    console.error(err);
+    githubSync.setStatus('Download fehlgeschlagen. Prüfe Token, Repository oder Rechte.', 'error');
+  }
+}
+
+async function pushToGithub() {
+  const config = collectGithubConfig();
+  if (!config.owner || !config.repo || !config.file) {
+    githubSync.setStatus('Bitte Owner, Repository und Dateipfad ausfüllen.', 'error');
+    return;
+  }
+
+  githubSync.save(config);
+  githubSync.setStatus('Lade bestehenden Stand von GitHub…');
+  try {
+    const existing = await fetchGithubFile(config);
+    const payload = {
+      message: 'Sync NFL Predictions Datenbank',
+      branch: config.branch,
+      content: toBase64(
+        JSON.stringify(
+          {
+            users: auth.users,
+            lockDates: getLockDates(),
+          },
+          null,
+          2
+        )
+      ),
+    };
+
+    if (existing?.sha) payload.sha = existing.sha;
+
+    const url = `https://api.github.com/repos/${config.owner}/${config.repo}/contents/${config.file}`;
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: { ...githubHeaders(config.token), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) throw new Error('Upload fehlgeschlagen.');
+    githubSync.setStatus('Datenbank erfolgreich nach GitHub geschrieben.', 'success');
+  } catch (err) {
+    console.error(err);
+    githubSync.setStatus('Upload fehlgeschlagen. Prüfe Token und Schreibrechte.', 'error');
+  }
+}
+
 function updateSaveState(message = '') {
   const locked = isLocked();
   elements.savePredictions.disabled = locked;
@@ -517,8 +707,9 @@ function updateSaveState(message = '') {
 }
 
 function updateLockInfo() {
+  const lockDate = getLockDateForSeason(predictionSeason);
   const locked = isLocked();
-  const readable = LOCK_DATE.toLocaleString('de-DE', { dateStyle: 'long', timeStyle: 'short' });
+  const readable = lockDate.toLocaleString('de-DE', { dateStyle: 'long', timeStyle: 'short' });
   elements.lockInfo.textContent = locked
     ? `Tipps sind seit ${readable} gesperrt.`
     : `Tipps können bis ${readable} bearbeitet werden.`;
@@ -527,6 +718,38 @@ function updateLockInfo() {
     input.disabled = locked;
   });
   updateOverviewAccess();
+}
+
+function updateLockDateForm() {
+  if (!elements.lockSeasonSelect || !elements.lockDateInput) return;
+  const season = elements.lockSeasonSelect.value || predictionSeason;
+  const lockDate = getLockDateForSeason(season);
+  elements.lockDateInput.value = formatLockDateForInput(lockDate);
+  if (elements.lockDateStatus) elements.lockDateStatus.textContent = '';
+}
+
+function handleLockDateSave() {
+  if (!elements.lockSeasonSelect || !elements.lockDateInput) return;
+  const season = elements.lockSeasonSelect.value;
+  const rawValue = elements.lockDateInput.value;
+  if (!rawValue) {
+    elements.lockDateStatus.textContent = 'Bitte ein gültiges Datum wählen.';
+    elements.lockDateStatus.className = 'status error';
+    return;
+  }
+
+  const iso = new Date(rawValue).toISOString();
+  const lockDates = getLockDates();
+  lockDates[season] = iso;
+  saveLockDates(lockDates);
+  elements.lockDateStatus.textContent = 'Stichtag gespeichert.';
+  elements.lockDateStatus.className = 'status success';
+
+  if (season === predictionSeason) {
+    updateLockInfo();
+    const current = auth.getUser(auth.currentUser);
+    if (current) renderPredictions(migratePredictions(current, predictionSeason));
+  }
 }
 
 function handlePredictionSeasonChange(event) {
@@ -538,10 +761,16 @@ function handlePredictionSeasonChange(event) {
     renderPredictions(migratePredictions(current, predictionSeason));
   }
   updateSaveState();
+  if (elements.lockSeasonSelect) {
+    elements.lockSeasonSelect.value = predictionSeason;
+    updateLockDateForm();
+  }
+  updateLockInfo();
 }
 
 function isLocked() {
-  return new Date() > LOCK_DATE;
+  const lockDate = getLockDateForSeason(predictionSeason);
+  return new Date() > lockDate;
 }
 
 function savePredictions() {
@@ -889,6 +1118,8 @@ function setupEvents() {
   elements.logoutBtn.addEventListener('click', () => { auth.logout(); updateAuthUI(); showAuth('login'); });
   elements.profileForm.addEventListener('submit', handleProfileSubmit);
   elements.savePredictions.addEventListener('click', savePredictions);
+  elements.lockSeasonSelect?.addEventListener('change', updateLockDateForm);
+  elements.saveLockDate?.addEventListener('click', handleLockDateSave);
   elements.tabButtons.forEach(btn =>
     btn.addEventListener('click', () => {
       if (btn.disabled) return;
@@ -898,12 +1129,20 @@ function setupEvents() {
   elements.refreshStats.addEventListener('click', loadStats);
   elements.seasonSelect.addEventListener('change', event => loadStats(event.target.value));
   elements.predictionSeasonSelect.addEventListener('change', handlePredictionSeasonChange);
+  elements.githubSaveConfig?.addEventListener('click', () => {
+    githubSync.save(collectGithubConfig());
+    githubSync.setStatus('GitHub-Konfiguration gespeichert.', 'success');
+  });
+  elements.githubPull?.addEventListener('click', pullFromGithub);
+  elements.githubPush?.addEventListener('click', pushToGithub);
 }
 
 function init() {
   populateTeamSelect();
   populateSeasonSelect();
   populatePredictionSeasonSelect();
+  populateLockSeasonSelect();
+  githubSync.applyConfigToForm();
   showAuth('login');
   setupEvents();
   if (auth.currentUser) {
