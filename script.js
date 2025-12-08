@@ -1,6 +1,41 @@
-const LOCK_DATE = new Date('2024-09-01T12:00:00Z');
+const LOCK_DATE = new Date('2026-09-01T12:00:00Z');
 const CONFERENCE_ORDER = ['AFC', 'NFC'];
 const DIVISION_ORDER = ['East', 'North', 'South', 'West'];
+
+const teamLogos = {
+  'Buffalo Bills': 'https://a.espncdn.com/i/teamlogos/nfl/500/buf.png',
+  'Miami Dolphins': 'https://a.espncdn.com/i/teamlogos/nfl/500/mia.png',
+  'New England Patriots': 'https://a.espncdn.com/i/teamlogos/nfl/500/ne.png',
+  'New York Jets': 'https://a.espncdn.com/i/teamlogos/nfl/500/nyj.png',
+  'Baltimore Ravens': 'https://a.espncdn.com/i/teamlogos/nfl/500/bal.png',
+  'Cincinnati Bengals': 'https://a.espncdn.com/i/teamlogos/nfl/500/cin.png',
+  'Cleveland Browns': 'https://a.espncdn.com/i/teamlogos/nfl/500/cle.png',
+  'Pittsburgh Steelers': 'https://a.espncdn.com/i/teamlogos/nfl/500/pit.png',
+  'Houston Texans': 'https://a.espncdn.com/i/teamlogos/nfl/500/hou.png',
+  'Indianapolis Colts': 'https://a.espncdn.com/i/teamlogos/nfl/500/ind.png',
+  'Jacksonville Jaguars': 'https://a.espncdn.com/i/teamlogos/nfl/500/jac.png',
+  'Tennessee Titans': 'https://a.espncdn.com/i/teamlogos/nfl/500/ten.png',
+  'Denver Broncos': 'https://a.espncdn.com/i/teamlogos/nfl/500/den.png',
+  'Kansas City Chiefs': 'https://a.espncdn.com/i/teamlogos/nfl/500/kc.png',
+  'Las Vegas Raiders': 'https://a.espncdn.com/i/teamlogos/nfl/500/lv.png',
+  'Los Angeles Chargers': 'https://a.espncdn.com/i/teamlogos/nfl/500/lac.png',
+  'Dallas Cowboys': 'https://a.espncdn.com/i/teamlogos/nfl/500/dal.png',
+  'New York Giants': 'https://a.espncdn.com/i/teamlogos/nfl/500/nyg.png',
+  'Philadelphia Eagles': 'https://a.espncdn.com/i/teamlogos/nfl/500/phi.png',
+  'Washington Commanders': 'https://a.espncdn.com/i/teamlogos/nfl/500/wsh.png',
+  'Chicago Bears': 'https://a.espncdn.com/i/teamlogos/nfl/500/chi.png',
+  'Detroit Lions': 'https://a.espncdn.com/i/teamlogos/nfl/500/det.png',
+  'Green Bay Packers': 'https://a.espncdn.com/i/teamlogos/nfl/500/gb.png',
+  'Minnesota Vikings': 'https://a.espncdn.com/i/teamlogos/nfl/500/min.png',
+  'Atlanta Falcons': 'https://a.espncdn.com/i/teamlogos/nfl/500/atl.png',
+  'Carolina Panthers': 'https://a.espncdn.com/i/teamlogos/nfl/500/car.png',
+  'New Orleans Saints': 'https://a.espncdn.com/i/teamlogos/nfl/500/no.png',
+  'Tampa Bay Buccaneers': 'https://a.espncdn.com/i/teamlogos/nfl/500/tb.png',
+  'Arizona Cardinals': 'https://a.espncdn.com/i/teamlogos/nfl/500/ari.png',
+  'Los Angeles Rams': 'https://a.espncdn.com/i/teamlogos/nfl/500/lar.png',
+  'San Francisco 49ers': 'https://a.espncdn.com/i/teamlogos/nfl/500/sf.png',
+  'Seattle Seahawks': 'https://a.espncdn.com/i/teamlogos/nfl/500/sea.png',
+};
 
 const teams = [
   { name: 'Buffalo Bills', conference: 'AFC', division: 'East', league: 'NFL' },
@@ -156,6 +191,28 @@ function sortTeams() {
   });
 }
 
+function getTeamLogo(teamName) {
+  return teamLogos[teamName] || '';
+}
+
+function renderTeamLabel(name) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'team-label';
+
+  const logo = document.createElement('img');
+  logo.className = 'team-logo';
+  logo.src = getTeamLogo(name);
+  logo.alt = `${name} Logo`;
+  logo.loading = 'lazy';
+
+  const text = document.createElement('span');
+  text.textContent = name;
+
+  wrapper.appendChild(logo);
+  wrapper.appendChild(text);
+  return wrapper;
+}
+
 function populateTeamSelect() {
   teams.forEach(team => {
     const option = document.createElement('option');
@@ -229,7 +286,7 @@ function renderPredictions(predictions) {
     row.dataset.divisionKey = `${team.conference}-${team.division}`;
 
     const teamCell = document.createElement('td');
-    teamCell.textContent = team.name;
+    teamCell.appendChild(renderTeamLabel(team.name));
 
     const conferenceCell = document.createElement('td');
     conferenceCell.textContent = team.conference;
@@ -460,8 +517,7 @@ function renderStats(data) {
   }
   const groups = data.children
     .filter(item => item.standings && item.standings.entries)
-    .flatMap(item => item.standings.entries)
-    .slice(0, 12); // keep things small for display
+    .flatMap(item => item.standings.entries);
 
   const container = document.createElement('div');
   container.className = 'stats-grid';
@@ -471,13 +527,25 @@ function renderStats(data) {
     const wins = entry.stats?.find(s => s.name === 'wins')?.value ?? '-';
     const losses = entry.stats?.find(s => s.name === 'losses')?.value ?? '-';
     const pct = entry.stats?.find(s => s.name === 'winPercent')?.value ?? '-';
+    const logo = entry.team?.logos?.[0]?.href || getTeamLogo(teamName);
 
     const card = document.createElement('div');
     card.className = 'stat-card';
+
     card.innerHTML = `
-      <h4>${teamName}</h4>
-      <p>Bilanz: ${wins}-${losses}</p>
-      <p>Siegquote: ${(pct * 100).toFixed ? (pct * 100).toFixed(1) + '%' : pct}</p>
+      <div class="stat-card__header">
+        <img src="${logo}" alt="${teamName} Logo" class="team-logo" loading="lazy" />
+        <div>
+          <h4>${teamName}</h4>
+          <p class="stat-meta">${entry.standings?.note || ''}</p>
+        </div>
+      </div>
+      <div class="stat-card__body">
+        <p><span>Bilanz</span><strong>${wins}-${losses}</strong></p>
+        <p><span>Siegquote</span><strong>${
+          (pct * 100).toFixed ? (pct * 100).toFixed(1) + '%' : pct
+        }</strong></p>
+      </div>
     `;
     container.appendChild(card);
   });
