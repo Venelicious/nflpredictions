@@ -94,7 +94,13 @@
         <section id="statsTab" class="tab-pane">
           <div class="pane-header">
             <h2>Aktuelle NFL Statistiken</h2>
-            <button id="refreshStats" class="secondary">Neu laden</button>
+            <div class="pane-actions">
+              <label class="season-picker">
+                Saison:
+                <select id="seasonSelect"></select>
+              </label>
+              <button id="refreshStats" class="secondary">Neu laden</button>
+            </div>
           </div>
           <div id="statsContent" class="card">Starte eine Aktualisierung…</div>
         </section>

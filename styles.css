@@ -148,6 +148,32 @@ button.cta {
   margin-bottom: 16px;
 }
 
+.pane-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pane-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.season-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.season-picker select {
+  min-width: 180px;
+}
+
 .tab-button {
   flex: 1;
   padding: 12px;
