@@ -131,6 +131,12 @@ button.secondary {
   font-weight: 700;
 }
 
+button.secondary.danger {
+  background: #fff1f0;
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
 button.cta {
   background: var(--accent);
   color: #fff;

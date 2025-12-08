@@ -54,6 +54,7 @@
           <div class="coplayer-picker__controls">
             <select id="coPlayerSelect"></select>
             <button id="addCoPlayer" type="button" class="secondary">Mitspieler hinzufügen</button>
+            <button id="deleteCoPlayer" type="button" class="secondary danger">Mitspieler löschen</button>
           </div>
         </div>
         <p class="hint">Gilt für Tipps, Stats und Übersicht.</p>

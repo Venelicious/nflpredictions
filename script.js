@@ -197,6 +197,7 @@ const elements = {
   authArea: document.getElementById('authArea'),
   coPlayerSelect: document.getElementById('coPlayerSelect'),
   addCoPlayer: document.getElementById('addCoPlayer'),
+  deleteCoPlayer: document.getElementById('deleteCoPlayer'),
   statsContent: document.getElementById('statsContent'),
   refreshStats: document.getElementById('refreshStats'),
   overviewContent: document.getElementById('overviewContent'),
@@ -602,6 +603,39 @@ function handleAddCoPlayer() {
   refreshCoPlayerSelect();
   loadPredictionsForActive();
   elements.predictionStatus.textContent = `${newPlayer.name} wurde angelegt. Du bearbeitest jetzt seine Tipps.`;
+}
+
+function handleDeleteCoPlayer() {
+  if (!elements.coPlayerSelect) return;
+  const [type, id] = (elements.coPlayerSelect.value || '').split(':');
+  if (type !== 'co') {
+    elements.predictionStatus.textContent = 'Bitte zuerst einen Mitspieler auswählen.';
+    elements.predictionStatus.className = 'status error';
+    return;
+  }
+
+  const coPlayers = readCoPlayers();
+  const player = coPlayers.find(p => p.id === id);
+  if (!player) return;
+
+  const confirmed = confirm(`Mitspieler "${player.name}" wirklich löschen?`);
+  if (!confirmed) return;
+
+  const remaining = coPlayers.filter(p => p.id !== id);
+  saveCoPlayers(remaining);
+
+  const fallback = remaining[0]
+    ? { type: 'co', id: remaining[0].id }
+    : { type: 'user', id: auth.currentUser || '' };
+
+  if (getActivePredictor().id === id) {
+    setActivePredictor(fallback);
+  }
+
+  refreshCoPlayerSelect();
+  loadPredictionsForActive();
+  elements.predictionStatus.textContent = `${player.name} wurde gelöscht.`;
+  elements.predictionStatus.className = 'status success';
 }
 
 function loadPredictionsForActive() {
@@ -1371,6 +1405,7 @@ function setupEvents() {
   elements.saveLockDate?.addEventListener('click', handleLockDateSave);
   elements.coPlayerSelect?.addEventListener('change', handlePredictorChange);
   elements.addCoPlayer?.addEventListener('click', handleAddCoPlayer);
+  elements.deleteCoPlayer?.addEventListener('click', handleDeleteCoPlayer);
   elements.tabButtons.forEach(btn =>
     btn.addEventListener('click', () => {
       if (btn.disabled) return;
