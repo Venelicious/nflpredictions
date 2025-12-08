@@ -38,6 +38,7 @@
         <button class="tab-button active" data-tab="profileTab">Profil</button>
         <button class="tab-button" data-tab="predictionsTab">Tipps</button>
         <button class="tab-button" data-tab="statsTab">NFL Stats</button>
+        <button class="tab-button" data-tab="overviewTab">Tipps-Übersicht</button>
       </nav>
 
       <div class="tab-content">
@@ -96,6 +97,14 @@
             <button id="refreshStats" class="secondary">Neu laden</button>
           </div>
           <div id="statsContent" class="card">Starte eine Aktualisierung…</div>
+        </section>
+
+        <section id="overviewTab" class="tab-pane">
+          <div class="pane-header">
+            <h2>Vorhersagen aller Benutzer</h2>
+            <p id="overviewStatus" class="hint"></p>
+          </div>
+          <div id="overviewContent" class="card"></div>
         </section>
       </div>
     </section>
