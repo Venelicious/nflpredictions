@@ -7,6 +7,8 @@ const AVAILABLE_SEASONS = [
   { value: '2025', label: 'Saison 2025/2026' },
 ];
 let selectedSeason = AVAILABLE_SEASONS[0].value;
+const PREDICTION_SEASON_KEY = 'nflp_prediction_season';
+let predictionSeason = localStorage.getItem(PREDICTION_SEASON_KEY) || AVAILABLE_SEASONS[0].value;
 
 const teamLogos = {
   'Buffalo Bills': 'https://a.espncdn.com/i/teamlogos/nfl/500/buf.png',
@@ -105,7 +107,7 @@ const auth = {
       email,
       password: btoa(password),
       favorite: '',
-      predictions: defaultPredictions(),
+      predictionsBySeason: { [predictionSeason]: defaultPredictions() },
     };
     this.users = [...this.users, user];
     this.currentUser = email;
@@ -124,9 +126,19 @@ const auth = {
     const updated = this.users.map(u => (u.email === email ? { ...u, ...payload } : u));
     this.users = updated;
   },
-  updatePredictions(email, predictions) {
+  updatePredictions(email, predictions, season = predictionSeason) {
     const updated = this.users.map(u => (u.email === email ? { ...u, predictions } : u));
-    this.users = updated;
+    const cleaned = updated.map(u => {
+      if (u.email !== email) return u;
+      const predictionsBySeason = {
+        ...(u.predictionsBySeason || {}),
+        [season]: predictions,
+      };
+      const copy = { ...u, predictionsBySeason };
+      delete copy.predictions;
+      return copy;
+    });
+    this.users = cleaned;
   },
   getUser(email) {
     return this.users.find(u => u.email === email);
@@ -152,7 +164,8 @@ const elements = {
   profileFavorite: document.getElementById('profileFavorite'),
   profileStatus: document.getElementById('profileStatus'),
   lockInfo: document.getElementById('lockInfo'),
-  predictionsTable: document.querySelector('#predictionsTable tbody'),
+  predictionsContent: document.getElementById('predictionsContent'),
+  predictionSeasonSelect: document.getElementById('predictionSeasonSelect'),
   savePredictions: document.getElementById('savePredictions'),
   predictionStatus: document.getElementById('predictionStatus'),
   startNow: document.getElementById('startNow'),
@@ -177,6 +190,24 @@ function defaultPredictions() {
     acc[team.name] = { divisionRank: nextRank, wins: 9, losses: 8 };
     return acc;
   }, {});
+}
+
+function migratePredictions(user, season = predictionSeason) {
+  if (!user) return defaultPredictions();
+  const predictionsBySeason = {
+    ...(user.predictionsBySeason || {}),
+  };
+
+  if (!Object.keys(predictionsBySeason).length) {
+    predictionsBySeason[AVAILABLE_SEASONS[0].value] = user.predictions || defaultPredictions();
+  }
+
+  if (!predictionsBySeason[season]) {
+    predictionsBySeason[season] = defaultPredictions();
+  }
+
+  auth.updateProfile(user.email, { predictionsBySeason });
+  return predictionsBySeason[season];
 }
 
 function normalizePrediction(prediction = {}) {
@@ -242,6 +273,17 @@ function populateSeasonSelect() {
   elements.seasonSelect.value = selectedSeason;
 }
 
+function populatePredictionSeasonSelect() {
+  elements.predictionSeasonSelect.innerHTML = '';
+  AVAILABLE_SEASONS.forEach(season => {
+    const option = document.createElement('option');
+    option.value = season.value;
+    option.textContent = season.label;
+    elements.predictionSeasonSelect.appendChild(option);
+  });
+  elements.predictionSeasonSelect.value = predictionSeason;
+}
+
 function showAuth(mode) {
   elements.loginForm.classList.toggle('hidden', mode !== 'login');
   elements.registerForm.classList.toggle('hidden', mode !== 'register');
@@ -260,7 +302,8 @@ function updateAuthUI() {
     elements.profileName.value = user?.name || '';
     elements.profileEmail.value = user?.email || '';
     elements.profileFavorite.value = user?.favorite || '';
-    renderPredictions(user?.predictions || defaultPredictions());
+    elements.predictionSeasonSelect.value = predictionSeason;
+    renderPredictions(migratePredictions(user, predictionSeason));
     updateLockInfo();
   } else {
     updateOverviewAccess();
@@ -274,102 +317,106 @@ function switchTab(targetId) {
   elements.tabPanes.forEach(pane => pane.classList.toggle('active', pane.id === targetId));
 }
 
-function createGroupRow(label, level) {
-  const row = document.createElement('tr');
-  row.className = `group-row group-row--${level}`;
-  const cell = document.createElement('td');
-  cell.colSpan = 5;
-  cell.textContent = label;
-  row.appendChild(cell);
-  return row;
-}
-
 function renderPredictions(predictions) {
-  elements.predictionsTable.innerHTML = '';
+  elements.predictionsContent.innerHTML = '';
   const lockExpired = isLocked();
-  const sorted = sortTeams();
-  let currentConference = '';
-  let currentDivision = '';
+  const container = document.createElement('div');
+  container.className = 'stats-columns prediction-columns';
 
-  sorted.forEach(team => {
-    const prediction = normalizePrediction(predictions[team.name]);
+  CONFERENCE_ORDER.forEach(conf => {
+    const column = document.createElement('div');
+    column.className = 'stats-column';
+    column.innerHTML = `<h3>${conf}</h3>`;
 
-    if (team.conference !== currentConference) {
-      currentConference = team.conference;
-      elements.predictionsTable.appendChild(createGroupRow(`${team.league} – ${currentConference}`, 'conference'));
-      currentDivision = '';
-    }
+    STAT_DIVISION_ORDER.forEach(div => {
+      const division = document.createElement('div');
+      division.className = 'stats-division stats-division--editable';
+      division.innerHTML = `<div class="stats-division__title">${div}</div>`;
 
-    if (team.division !== currentDivision) {
-      currentDivision = team.division;
-      elements.predictionsTable.appendChild(createGroupRow(`${currentConference} ${currentDivision}`, 'division'));
-    }
+      const list = document.createElement('div');
+      list.className = 'stats-division__list prediction-list';
 
-    const row = document.createElement('tr');
-    row.dataset.team = team.name;
-    row.dataset.divisionKey = `${team.conference}-${team.division}`;
+      const divisionTeams = teams
+        .filter(team => team.conference === conf && team.division === div)
+        .map(team => ({ team, prediction: normalizePrediction(predictions[team.name]) }))
+        .sort((a, b) => a.prediction.divisionRank - b.prediction.divisionRank);
 
-    const teamCell = document.createElement('td');
-    teamCell.appendChild(renderTeamLabel(team.name));
+      divisionTeams.forEach(({ team, prediction }) => {
+        const row = document.createElement('div');
+        row.className = 'stat-row prediction-row';
+        row.dataset.team = team.name;
+        row.dataset.divisionKey = `${team.conference}-${team.division}`;
 
-    const conferenceCell = document.createElement('td');
-    conferenceCell.textContent = team.conference;
+        const teamArea = document.createElement('div');
+        teamArea.className = 'stat-row__team prediction-team';
 
-    const divisionCell = document.createElement('td');
-    divisionCell.textContent = team.division;
+        const rankInput = document.createElement('input');
+        rankInput.type = 'number';
+        rankInput.min = '1';
+        rankInput.max = '4';
+        rankInput.value = prediction.divisionRank;
+        rankInput.dataset.team = team.name;
+        rankInput.dataset.field = 'divisionRank';
+        rankInput.disabled = lockExpired;
+        rankInput.addEventListener('input', handlePredictionChange);
 
-    const rankCell = document.createElement('td');
-    const rankInput = document.createElement('input');
-    rankInput.type = 'number';
-    rankInput.min = '1';
-    rankInput.max = '4';
-    rankInput.value = prediction.divisionRank;
-    rankInput.dataset.team = team.name;
-    rankInput.dataset.field = 'divisionRank';
-    rankInput.disabled = lockExpired;
-    rankInput.addEventListener('input', handlePredictionChange);
-    rankCell.appendChild(rankInput);
+        const logo = document.createElement('img');
+        logo.src = getTeamLogo(team.name);
+        logo.alt = `${team.name} Logo`;
+        logo.className = 'team-logo';
+        logo.loading = 'lazy';
 
-    const recordCell = document.createElement('td');
-    recordCell.className = 'record-inputs';
+        const teamName = document.createElement('span');
+        teamName.textContent = team.name;
 
-    const winsInput = document.createElement('input');
-    winsInput.type = 'number';
-    winsInput.min = '0';
-    winsInput.max = '17';
-    winsInput.value = prediction.wins;
-    winsInput.dataset.team = team.name;
-    winsInput.dataset.field = 'wins';
-    winsInput.disabled = lockExpired;
-    winsInput.addEventListener('input', handlePredictionChange);
+        teamArea.appendChild(rankInput);
+        teamArea.appendChild(logo);
+        teamArea.appendChild(teamName);
 
-    const separator = document.createElement('span');
-    separator.textContent = '–';
-    separator.className = 'record-separator';
+        const meta = document.createElement('div');
+        meta.className = 'stat-row__record prediction-record';
 
-    const lossesInput = document.createElement('input');
-    lossesInput.type = 'number';
-    lossesInput.min = '0';
-    lossesInput.max = '17';
-    lossesInput.value = prediction.losses;
-    lossesInput.dataset.team = team.name;
-    lossesInput.dataset.field = 'losses';
-    lossesInput.disabled = lockExpired;
-    lossesInput.addEventListener('input', handlePredictionChange);
+        const winsInput = document.createElement('input');
+        winsInput.type = 'number';
+        winsInput.min = '0';
+        winsInput.max = '17';
+        winsInput.value = prediction.wins;
+        winsInput.dataset.team = team.name;
+        winsInput.dataset.field = 'wins';
+        winsInput.disabled = lockExpired;
+        winsInput.addEventListener('input', handlePredictionChange);
 
-    recordCell.appendChild(winsInput);
-    recordCell.appendChild(separator);
-    recordCell.appendChild(lossesInput);
+        const separator = document.createElement('span');
+        separator.textContent = '–';
+        separator.className = 'record-separator';
 
-    row.appendChild(teamCell);
-    row.appendChild(conferenceCell);
-    row.appendChild(divisionCell);
-    row.appendChild(rankCell);
-    row.appendChild(recordCell);
+        const lossesInput = document.createElement('input');
+        lossesInput.type = 'number';
+        lossesInput.min = '0';
+        lossesInput.max = '17';
+        lossesInput.value = prediction.losses;
+        lossesInput.dataset.team = team.name;
+        lossesInput.dataset.field = 'losses';
+        lossesInput.disabled = lockExpired;
+        lossesInput.addEventListener('input', handlePredictionChange);
 
-    elements.predictionsTable.appendChild(row);
+        meta.appendChild(winsInput);
+        meta.appendChild(separator);
+        meta.appendChild(lossesInput);
+
+        row.appendChild(teamArea);
+        row.appendChild(meta);
+        list.appendChild(row);
+      });
+
+      division.appendChild(list);
+      column.appendChild(division);
+    });
+
+    container.appendChild(column);
   });
 
+  elements.predictionsContent.appendChild(container);
   highlightConflicts(predictions);
   updateSaveState();
 }
@@ -424,7 +471,8 @@ function handlePredictionChange(event) {
   const team = event.target.dataset.team;
   const field = event.target.dataset.field;
   const rawValue = parseInt(event.target.value, 10);
-  const prediction = normalizePrediction(current.predictions[team]);
+  const predictions = migratePredictions(current, predictionSeason);
+  const prediction = normalizePrediction(predictions[team]);
 
   if (field === 'divisionRank') {
     prediction.divisionRank = clamp(rawValue || 1, 1, 4);
@@ -434,10 +482,10 @@ function handlePredictionChange(event) {
     prediction.losses = clamp(rawValue || 0, 0, 17);
   }
 
-  current.predictions[team] = prediction;
+  predictions[team] = prediction;
   event.target.value = prediction[field];
-  highlightConflicts(current.predictions);
-  auth.updatePredictions(current.email, current.predictions);
+  highlightConflicts(predictions);
+  auth.updatePredictions(current.email, predictions, predictionSeason);
   updateSaveState('Änderungen werden automatisch zwischengespeichert.');
 }
 
@@ -452,7 +500,7 @@ function highlightConflicts(predictions) {
       (divisionCounts[divisionKey][prediction.divisionRank] || 0) + 1;
   });
 
-  elements.predictionsTable.querySelectorAll('input[data-field="divisionRank"]').forEach(input => {
+  elements.predictionsContent.querySelectorAll('input[data-field="divisionRank"]').forEach(input => {
     const team = teams.find(t => t.name === input.dataset.team);
     const divisionKey = `${team.conference}-${team.division}`;
     const isConflict = divisionCounts[divisionKey][Number(input.value)] > 1;
@@ -475,10 +523,21 @@ function updateLockInfo() {
     ? `Tipps sind seit ${readable} gesperrt.`
     : `Tipps können bis ${readable} bearbeitet werden.`;
   elements.savePredictions.disabled = locked;
-  elements.predictionsTable.querySelectorAll('input').forEach(input => {
+  elements.predictionsContent.querySelectorAll('input').forEach(input => {
     input.disabled = locked;
   });
   updateOverviewAccess();
+}
+
+function handlePredictionSeasonChange(event) {
+  predictionSeason = event.target.value;
+  localStorage.setItem(PREDICTION_SEASON_KEY, predictionSeason);
+
+  const current = auth.getUser(auth.currentUser);
+  if (current) {
+    renderPredictions(migratePredictions(current, predictionSeason));
+  }
+  updateSaveState();
 }
 
 function isLocked() {
@@ -493,7 +552,7 @@ function savePredictions() {
   let hasConflict = false;
   let invalidRecord = false;
 
-  elements.predictionsTable.querySelectorAll('tr[data-team]').forEach(row => {
+  elements.predictionsContent.querySelectorAll('.prediction-row').forEach(row => {
     const team = row.dataset.team;
     const divisionKey = row.dataset.divisionKey;
     const divisionRank = Number(row.querySelector('input[data-field="divisionRank"]').value);
@@ -531,7 +590,7 @@ function savePredictions() {
     return;
   }
 
-  auth.updatePredictions(user.email, predictions);
+  auth.updatePredictions(user.email, predictions, predictionSeason);
   elements.predictionStatus.textContent = 'Tipps gespeichert!';
   elements.predictionStatus.className = 'status success';
 }
@@ -725,7 +784,8 @@ function renderPredictionsOverview() {
   }
 
   users.forEach(user => {
-    const totalPoints = calculateUserTotalPoints(user.predictions);
+    const seasonPredictions = migratePredictions(user, predictionSeason);
+    const totalPoints = calculateUserTotalPoints(seasonPredictions);
     const card = document.createElement('div');
     card.className = 'overview-card';
 
@@ -757,7 +817,7 @@ function renderPredictionsOverview() {
 
         const divisionTeams = teams
           .filter(t => t.conference === conf && t.division === div)
-          .map(team => ({ team, prediction: normalizePrediction(user.predictions?.[team.name]) }))
+          .map(team => ({ team, prediction: normalizePrediction(seasonPredictions?.[team.name]) }))
           .sort((a, b) => a.prediction.divisionRank - b.prediction.divisionRank);
 
         const divisionBonus = standingsAvailable ? calculateDivisionBonus(divisionTeams) : null;
@@ -837,11 +897,13 @@ function setupEvents() {
   );
   elements.refreshStats.addEventListener('click', loadStats);
   elements.seasonSelect.addEventListener('change', event => loadStats(event.target.value));
+  elements.predictionSeasonSelect.addEventListener('change', handlePredictionSeasonChange);
 }
 
 function init() {
   populateTeamSelect();
   populateSeasonSelect();
+  populatePredictionSeasonSelect();
   showAuth('login');
   setupEvents();
   if (auth.currentUser) {
