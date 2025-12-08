@@ -1254,7 +1254,7 @@ function buildOverviewScoreboard(participants) {
     <div class="hint">Punkte werden nur berechnet, wenn aktuelle Standings vorhanden sind.</div>
   `;
 
-  const columnTemplate = `repeat(${participants.length + 1}, minmax(150px, 1fr))`;
+  const columnTemplate = `repeat(${participants.length + 1}, minmax(140px, 1fr))`;
 
   wrapper.appendChild(header);
 

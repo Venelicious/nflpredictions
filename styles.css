@@ -566,6 +566,7 @@ button { font-family: inherit; }
   box-shadow: var(--shadow);
   background: var(--panel);
   padding: 12px;
+  overflow-x: auto;
 }
 
 .overview-scoreboard__header {
@@ -602,6 +603,7 @@ button { font-family: inherit; }
   gap: 6px;
   padding: 8px 10px;
   align-items: stretch;
+  min-width: max-content;
 }
 
 .scoreboard__header-row--global {
