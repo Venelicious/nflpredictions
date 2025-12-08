@@ -1,6 +1,7 @@
 const LOCK_DATE = new Date('2026-09-01T12:00:00Z');
 const CONFERENCE_ORDER = ['AFC', 'NFC'];
 const DIVISION_ORDER = ['East', 'North', 'South', 'West'];
+const STAT_DIVISION_ORDER = ['North', 'East', 'South', 'West'];
 
 const teamLogos = {
   'Buffalo Bills': 'https://a.espncdn.com/i/teamlogos/nfl/500/buf.png',
@@ -153,6 +154,8 @@ const elements = {
   authArea: document.getElementById('authArea'),
   statsContent: document.getElementById('statsContent'),
   refreshStats: document.getElementById('refreshStats'),
+  overviewContent: document.getElementById('overviewContent'),
+  overviewStatus: document.getElementById('overviewStatus'),
 };
 
 function clamp(value, min, max) {
@@ -242,10 +245,14 @@ function updateAuthUI() {
     elements.profileFavorite.value = user?.favorite || '';
     renderPredictions(user?.predictions || defaultPredictions());
     updateLockInfo();
+  } else {
+    updateOverviewAccess();
   }
 }
 
 function switchTab(targetId) {
+  const targetButton = Array.from(elements.tabButtons).find(btn => btn.dataset.tab === targetId);
+  if (targetButton?.disabled) return;
   elements.tabButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === targetId));
   elements.tabPanes.forEach(pane => pane.classList.toggle('active', pane.id === targetId));
 }
@@ -410,6 +417,7 @@ function updateLockInfo() {
   elements.predictionsTable.querySelectorAll('input').forEach(input => {
     input.disabled = locked;
   });
+  updateOverviewAccess();
 }
 
 function isLocked() {
@@ -515,39 +523,84 @@ function renderStats(data) {
     elements.statsContent.textContent = 'Keine Daten verfügbar.';
     return;
   }
-  const groups = data.children
+  const entries = data.children
     .filter(item => item.standings && item.standings.entries)
     .flatMap(item => item.standings.entries);
 
+  const statsMap = entries.reduce((acc, entry) => {
+    const teamName = entry.team?.displayName;
+    if (!teamName) return acc;
+    const wins = entry.stats?.find(s => s.name === 'wins')?.value;
+    const losses = entry.stats?.find(s => s.name === 'losses')?.value;
+    const pct = entry.stats?.find(s => s.name === 'winPercent')?.value;
+    acc[teamName] = {
+      wins: typeof wins === 'number' ? wins : 0,
+      losses: typeof losses === 'number' ? losses : 0,
+      pct: typeof pct === 'number' ? pct : -1,
+      note: entry.standings?.note || '',
+      logo: entry.team?.logos?.[0]?.href || getTeamLogo(teamName),
+    };
+    return acc;
+  }, {});
+
+  const grouped = {};
+  teams.forEach(team => {
+    grouped[team.conference] = grouped[team.conference] || {};
+    grouped[team.conference][team.division] = grouped[team.conference][team.division] || [];
+    const stats = statsMap[team.name] || { wins: 0, losses: 0, pct: -1, note: '', logo: getTeamLogo(team.name) };
+    grouped[team.conference][team.division].push({ team, stats });
+  });
+
   const container = document.createElement('div');
-  container.className = 'stats-grid';
+  container.className = 'stats-columns';
 
-  groups.forEach(entry => {
-    const teamName = entry.team?.displayName || 'Team';
-    const wins = entry.stats?.find(s => s.name === 'wins')?.value ?? '-';
-    const losses = entry.stats?.find(s => s.name === 'losses')?.value ?? '-';
-    const pct = entry.stats?.find(s => s.name === 'winPercent')?.value ?? '-';
-    const logo = entry.team?.logos?.[0]?.href || getTeamLogo(teamName);
+  CONFERENCE_ORDER.forEach(conf => {
+    const column = document.createElement('div');
+    column.className = 'stats-column';
+    const heading = document.createElement('h3');
+    heading.textContent = conf;
+    column.appendChild(heading);
 
-    const card = document.createElement('div');
-    card.className = 'stat-card';
+    STAT_DIVISION_ORDER.forEach(div => {
+      const divisionTeams = (grouped[conf]?.[div] || []).sort((a, b) => {
+        if (a.stats.pct !== b.stats.pct) return b.stats.pct - a.stats.pct;
+        return b.stats.wins - a.stats.wins;
+      });
 
-    card.innerHTML = `
-      <div class="stat-card__header">
-        <img src="${logo}" alt="${teamName} Logo" class="team-logo" loading="lazy" />
-        <div>
-          <h4>${teamName}</h4>
-          <p class="stat-meta">${entry.standings?.note || ''}</p>
-        </div>
-      </div>
-      <div class="stat-card__body">
-        <p><span>Bilanz</span><strong>${wins}-${losses}</strong></p>
-        <p><span>Siegquote</span><strong>${
-          (pct * 100).toFixed ? (pct * 100).toFixed(1) + '%' : pct
-        }</strong></p>
-      </div>
-    `;
-    container.appendChild(card);
+      const division = document.createElement('div');
+      division.className = 'stats-division';
+      division.innerHTML = `<div class="stats-division__title">${div}</div>`;
+
+      const list = document.createElement('div');
+      list.className = 'stats-division__list';
+
+      divisionTeams.forEach((entry, idx) => {
+        const row = document.createElement('div');
+        row.className = 'stat-row';
+        row.innerHTML = `
+          <div class="stat-row__team">
+            <span class="stat-rank">${idx + 1}.</span>
+            <img src="${entry.stats.logo}" alt="${entry.team.name} Logo" class="team-logo" loading="lazy" />
+            <div>
+              <strong>${entry.team.name}</strong>
+              <p class="stat-meta">${entry.stats.note}</p>
+            </div>
+          </div>
+          <div class="stat-row__record">
+            <span>${entry.stats.wins}-${entry.stats.losses}</span>
+            <span class="stat-pct">${
+              entry.stats.pct >= 0 ? (entry.stats.pct * 100).toFixed(1) + '%' : '–'
+            }</span>
+          </div>
+        `;
+        list.appendChild(row);
+      });
+
+      division.appendChild(list);
+      column.appendChild(division);
+    });
+
+    container.appendChild(column);
   });
 
   elements.statsContent.innerHTML = '';
@@ -567,6 +620,99 @@ async function loadStats() {
   }
 }
 
+function renderPredictionsOverview() {
+  const locked = isLocked();
+  elements.overviewContent.innerHTML = '';
+
+  if (!locked) {
+    elements.overviewContent.textContent = 'Die Übersicht wird nach dem Stichtag freigeschaltet.';
+    return;
+  }
+
+  const users = auth.users;
+  if (!users.length) {
+    elements.overviewContent.textContent = 'Noch keine Benutzer vorhanden.';
+    return;
+  }
+
+  users.forEach(user => {
+    const card = document.createElement('div');
+    card.className = 'overview-card';
+
+    const title = document.createElement('div');
+    title.className = 'overview-card__header';
+    title.innerHTML = `
+      <div>
+        <h3>${user.name}</h3>
+        <p class="stat-meta">${user.email}${user.favorite ? ` • ${user.favorite}` : ''}</p>
+      </div>
+    `;
+
+    const grid = document.createElement('div');
+    grid.className = 'overview-grid';
+
+    CONFERENCE_ORDER.forEach(conf => {
+      const column = document.createElement('div');
+      column.className = 'overview-column';
+      column.innerHTML = `<h4>${conf}</h4>`;
+
+      STAT_DIVISION_ORDER.forEach(div => {
+        const division = document.createElement('div');
+        division.className = 'overview-division';
+        division.innerHTML = `<h5>${div}</h5>`;
+
+        const list = document.createElement('ol');
+        list.className = 'overview-list';
+
+        const divisionTeams = teams
+          .filter(t => t.conference === conf && t.division === div)
+          .map(team => ({ team, prediction: normalizePrediction(user.predictions?.[team.name]) }))
+          .sort((a, b) => a.prediction.divisionRank - b.prediction.divisionRank);
+
+        divisionTeams.forEach(entry => {
+          const item = document.createElement('li');
+          item.innerHTML = `
+            <div class="overview-team">
+              <span class="stat-rank">${entry.prediction.divisionRank}.</span>
+              <img src="${getTeamLogo(entry.team.name)}" alt="${entry.team.name} Logo" class="team-logo" loading="lazy" />
+              <span>${entry.team.name}</span>
+            </div>
+            <span class="stat-pct">${entry.prediction.wins}-${entry.prediction.losses}</span>
+          `;
+          list.appendChild(item);
+        });
+
+        division.appendChild(list);
+        column.appendChild(division);
+      });
+
+      grid.appendChild(column);
+    });
+
+    card.appendChild(title);
+    card.appendChild(grid);
+    elements.overviewContent.appendChild(card);
+  });
+}
+
+function updateOverviewAccess() {
+  const locked = isLocked();
+  const overviewBtn = Array.from(elements.tabButtons).find(btn => btn.dataset.tab === 'overviewTab');
+  if (overviewBtn) {
+    overviewBtn.disabled = !locked;
+    overviewBtn.classList.toggle('tab-button--disabled', !locked);
+    if (!locked && overviewBtn.classList.contains('active')) {
+      switchTab('profileTab');
+    }
+  }
+
+  elements.overviewStatus.textContent = locked
+    ? 'Stichtag erreicht – alle Tipps werden angezeigt.'
+    : 'Die Übersicht wird am Stichtag automatisch freigeschaltet.';
+
+  renderPredictionsOverview();
+}
+
 function setupEvents() {
   elements.showRegister.addEventListener('click', () => showAuth('register'));
   elements.showLogin.addEventListener('click', () => showAuth('login'));
@@ -576,7 +722,12 @@ function setupEvents() {
   elements.logoutBtn.addEventListener('click', () => { auth.logout(); updateAuthUI(); showAuth('login'); });
   elements.profileForm.addEventListener('submit', handleProfileSubmit);
   elements.savePredictions.addEventListener('click', savePredictions);
-  elements.tabButtons.forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.tab)));
+  elements.tabButtons.forEach(btn =>
+    btn.addEventListener('click', () => {
+      if (btn.disabled) return;
+      switchTab(btn.dataset.tab);
+    })
+  );
   elements.refreshStats.addEventListener('click', loadStats);
 }
 
@@ -587,6 +738,7 @@ function init() {
   if (auth.currentUser) {
     updateAuthUI();
   }
+  updateOverviewAccess();
   loadStats();
 }
 
