@@ -66,16 +66,19 @@
 
         <section id="predictionsTab" class="tab-pane">
           <div class="pane-header">
-            <h2>Tipps für die Abschlusstabelle (17 Spieltage)</h2>
+            <h2>Tipps für jede Division (17 Spieltage)</h2>
             <div class="lock-info" id="lockInfo"></div>
           </div>
-          <p class="hint">Ordne jedem Team seine finale Platzierung (1-32) zu. Doppelte Platzierungen werden hervorgehoben.</p>
+          <p class="hint">Sortiere alle 32 Teams innerhalb ihrer Division (Platz 1-4) und trage deine erwartete Bilanz ein (z. B. 10-7). Jede Platzierung darf pro Division nur einmal vergeben werden.</p>
           <div class="table-scroll">
             <table class="pred-table" id="predictionsTable">
               <thead>
                 <tr>
                   <th>Team</th>
-                  <th>Erwartete Platzierung</th>
+                  <th>Conference</th>
+                  <th>Division</th>
+                  <th>Platzierung</th>
+                  <th>Bilanz (S-N)</th>
                 </tr>
               </thead>
               <tbody></tbody>

@@ -1,12 +1,40 @@
 const LOCK_DATE = new Date('2024-09-01T12:00:00Z');
+const CONFERENCE_ORDER = ['AFC', 'NFC'];
+const DIVISION_ORDER = ['East', 'North', 'South', 'West'];
+
 const teams = [
-  'Arizona Cardinals', 'Atlanta Falcons', 'Baltimore Ravens', 'Buffalo Bills', 'Carolina Panthers',
-  'Chicago Bears', 'Cincinnati Bengals', 'Cleveland Browns', 'Dallas Cowboys', 'Denver Broncos',
-  'Detroit Lions', 'Green Bay Packers', 'Houston Texans', 'Indianapolis Colts', 'Jacksonville Jaguars',
-  'Kansas City Chiefs', 'Las Vegas Raiders', 'Los Angeles Chargers', 'Los Angeles Rams', 'Miami Dolphins',
-  'Minnesota Vikings', 'New England Patriots', 'New Orleans Saints', 'New York Giants', 'New York Jets',
-  'Philadelphia Eagles', 'Pittsburgh Steelers', 'San Francisco 49ers', 'Seattle Seahawks', 'Tampa Bay Buccaneers',
-  'Tennessee Titans', 'Washington Commanders'
+  { name: 'Buffalo Bills', conference: 'AFC', division: 'East', league: 'NFL' },
+  { name: 'Miami Dolphins', conference: 'AFC', division: 'East', league: 'NFL' },
+  { name: 'New England Patriots', conference: 'AFC', division: 'East', league: 'NFL' },
+  { name: 'New York Jets', conference: 'AFC', division: 'East', league: 'NFL' },
+  { name: 'Baltimore Ravens', conference: 'AFC', division: 'North', league: 'NFL' },
+  { name: 'Cincinnati Bengals', conference: 'AFC', division: 'North', league: 'NFL' },
+  { name: 'Cleveland Browns', conference: 'AFC', division: 'North', league: 'NFL' },
+  { name: 'Pittsburgh Steelers', conference: 'AFC', division: 'North', league: 'NFL' },
+  { name: 'Houston Texans', conference: 'AFC', division: 'South', league: 'NFL' },
+  { name: 'Indianapolis Colts', conference: 'AFC', division: 'South', league: 'NFL' },
+  { name: 'Jacksonville Jaguars', conference: 'AFC', division: 'South', league: 'NFL' },
+  { name: 'Tennessee Titans', conference: 'AFC', division: 'South', league: 'NFL' },
+  { name: 'Denver Broncos', conference: 'AFC', division: 'West', league: 'NFL' },
+  { name: 'Kansas City Chiefs', conference: 'AFC', division: 'West', league: 'NFL' },
+  { name: 'Las Vegas Raiders', conference: 'AFC', division: 'West', league: 'NFL' },
+  { name: 'Los Angeles Chargers', conference: 'AFC', division: 'West', league: 'NFL' },
+  { name: 'Dallas Cowboys', conference: 'NFC', division: 'East', league: 'NFL' },
+  { name: 'New York Giants', conference: 'NFC', division: 'East', league: 'NFL' },
+  { name: 'Philadelphia Eagles', conference: 'NFC', division: 'East', league: 'NFL' },
+  { name: 'Washington Commanders', conference: 'NFC', division: 'East', league: 'NFL' },
+  { name: 'Chicago Bears', conference: 'NFC', division: 'North', league: 'NFL' },
+  { name: 'Detroit Lions', conference: 'NFC', division: 'North', league: 'NFL' },
+  { name: 'Green Bay Packers', conference: 'NFC', division: 'North', league: 'NFL' },
+  { name: 'Minnesota Vikings', conference: 'NFC', division: 'North', league: 'NFL' },
+  { name: 'Atlanta Falcons', conference: 'NFC', division: 'South', league: 'NFL' },
+  { name: 'Carolina Panthers', conference: 'NFC', division: 'South', league: 'NFL' },
+  { name: 'New Orleans Saints', conference: 'NFC', division: 'South', league: 'NFL' },
+  { name: 'Tampa Bay Buccaneers', conference: 'NFC', division: 'South', league: 'NFL' },
+  { name: 'Arizona Cardinals', conference: 'NFC', division: 'West', league: 'NFL' },
+  { name: 'Los Angeles Rams', conference: 'NFC', division: 'West', league: 'NFL' },
+  { name: 'San Francisco 49ers', conference: 'NFC', division: 'West', league: 'NFL' },
+  { name: 'Seattle Seahawks', conference: 'NFC', division: 'West', league: 'NFL' },
 ];
 
 const auth = {
@@ -92,18 +120,47 @@ const elements = {
   refreshStats: document.getElementById('refreshStats'),
 };
 
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
 function defaultPredictions() {
-  return teams.reduce((acc, team, index) => {
-    acc[team] = index + 1;
+  const divisionCounts = {};
+  return teams.reduce((acc, team) => {
+    const divisionKey = `${team.conference}-${team.division}`;
+    const nextRank = ((divisionCounts[divisionKey] || 0) % 4) + 1;
+    divisionCounts[divisionKey] = nextRank;
+    acc[team.name] = { divisionRank: nextRank, wins: 9, losses: 8 };
     return acc;
   }, {});
+}
+
+function normalizePrediction(prediction = {}) {
+  return {
+    divisionRank: clamp(Number(prediction.divisionRank) || 1, 1, 4),
+    wins: clamp(Number(prediction.wins) || 0, 0, 17),
+    losses: clamp(Number(prediction.losses) || 0, 0, 17),
+  };
+}
+
+function sortTeams() {
+  return [...teams].sort((a, b) => {
+    if (a.league !== b.league) return a.league.localeCompare(b.league);
+    if (a.conference !== b.conference) {
+      return CONFERENCE_ORDER.indexOf(a.conference) - CONFERENCE_ORDER.indexOf(b.conference);
+    }
+    if (a.division !== b.division) {
+      return DIVISION_ORDER.indexOf(a.division) - DIVISION_ORDER.indexOf(b.division);
+    }
+    return a.name.localeCompare(b.name);
+  });
 }
 
 function populateTeamSelect() {
   teams.forEach(team => {
     const option = document.createElement('option');
-    option.value = team;
-    option.textContent = team;
+    option.value = team.name;
+    option.textContent = `${team.name} (${team.conference} ${team.division})`;
     elements.profileFavorite.appendChild(option);
   });
 }
@@ -136,29 +193,103 @@ function switchTab(targetId) {
   elements.tabPanes.forEach(pane => pane.classList.toggle('active', pane.id === targetId));
 }
 
+function createGroupRow(label, level) {
+  const row = document.createElement('tr');
+  row.className = `group-row group-row--${level}`;
+  const cell = document.createElement('td');
+  cell.colSpan = 5;
+  cell.textContent = label;
+  row.appendChild(cell);
+  return row;
+}
+
 function renderPredictions(predictions) {
   elements.predictionsTable.innerHTML = '';
   const lockExpired = isLocked();
-  Object.entries(predictions).forEach(([team, position]) => {
-    const row = document.createElement('tr');
-    const teamCell = document.createElement('td');
-    teamCell.textContent = team;
+  const sorted = sortTeams();
+  let currentConference = '';
+  let currentDivision = '';
 
-    const positionCell = document.createElement('td');
-    const input = document.createElement('input');
-    input.type = 'number';
-    input.min = '1';
-    input.max = '32';
-    input.value = position;
-    input.dataset.team = team;
-    input.disabled = lockExpired;
-    input.addEventListener('input', handlePredictionChange);
-    positionCell.appendChild(input);
+  sorted.forEach(team => {
+    const prediction = normalizePrediction(predictions[team.name]);
+
+    if (team.conference !== currentConference) {
+      currentConference = team.conference;
+      elements.predictionsTable.appendChild(createGroupRow(`${team.league} – ${currentConference}`, 'conference'));
+      currentDivision = '';
+    }
+
+    if (team.division !== currentDivision) {
+      currentDivision = team.division;
+      elements.predictionsTable.appendChild(createGroupRow(`${currentConference} ${currentDivision}`, 'division'));
+    }
+
+    const row = document.createElement('tr');
+    row.dataset.team = team.name;
+    row.dataset.divisionKey = `${team.conference}-${team.division}`;
+
+    const teamCell = document.createElement('td');
+    teamCell.textContent = team.name;
+
+    const conferenceCell = document.createElement('td');
+    conferenceCell.textContent = team.conference;
+
+    const divisionCell = document.createElement('td');
+    divisionCell.textContent = team.division;
+
+    const rankCell = document.createElement('td');
+    const rankInput = document.createElement('input');
+    rankInput.type = 'number';
+    rankInput.min = '1';
+    rankInput.max = '4';
+    rankInput.value = prediction.divisionRank;
+    rankInput.dataset.team = team.name;
+    rankInput.dataset.field = 'divisionRank';
+    rankInput.disabled = lockExpired;
+    rankInput.addEventListener('input', handlePredictionChange);
+    rankCell.appendChild(rankInput);
+
+    const recordCell = document.createElement('td');
+    recordCell.className = 'record-inputs';
+
+    const winsInput = document.createElement('input');
+    winsInput.type = 'number';
+    winsInput.min = '0';
+    winsInput.max = '17';
+    winsInput.value = prediction.wins;
+    winsInput.dataset.team = team.name;
+    winsInput.dataset.field = 'wins';
+    winsInput.disabled = lockExpired;
+    winsInput.addEventListener('input', handlePredictionChange);
+
+    const separator = document.createElement('span');
+    separator.textContent = '–';
+    separator.className = 'record-separator';
+
+    const lossesInput = document.createElement('input');
+    lossesInput.type = 'number';
+    lossesInput.min = '0';
+    lossesInput.max = '17';
+    lossesInput.value = prediction.losses;
+    lossesInput.dataset.team = team.name;
+    lossesInput.dataset.field = 'losses';
+    lossesInput.disabled = lockExpired;
+    lossesInput.addEventListener('input', handlePredictionChange);
+
+    recordCell.appendChild(winsInput);
+    recordCell.appendChild(separator);
+    recordCell.appendChild(lossesInput);
 
     row.appendChild(teamCell);
-    row.appendChild(positionCell);
+    row.appendChild(conferenceCell);
+    row.appendChild(divisionCell);
+    row.appendChild(rankCell);
+    row.appendChild(recordCell);
+
     elements.predictionsTable.appendChild(row);
   });
+
+  highlightConflicts(predictions);
   updateSaveState();
 }
 
@@ -166,20 +297,40 @@ function handlePredictionChange(event) {
   const current = auth.getUser(auth.currentUser);
   if (!current) return;
   const team = event.target.dataset.team;
-  const value = parseInt(event.target.value, 10) || 1;
-  current.predictions[team] = Math.min(32, Math.max(1, value));
+  const field = event.target.dataset.field;
+  const rawValue = parseInt(event.target.value, 10);
+  const prediction = normalizePrediction(current.predictions[team]);
+
+  if (field === 'divisionRank') {
+    prediction.divisionRank = clamp(rawValue || 1, 1, 4);
+  } else if (field === 'wins') {
+    prediction.wins = clamp(rawValue || 0, 0, 17);
+  } else if (field === 'losses') {
+    prediction.losses = clamp(rawValue || 0, 0, 17);
+  }
+
+  current.predictions[team] = prediction;
+  event.target.value = prediction[field];
   highlightConflicts(current.predictions);
   auth.updatePredictions(current.email, current.predictions);
   updateSaveState('Änderungen werden automatisch zwischengespeichert.');
 }
 
 function highlightConflicts(predictions) {
-  const counts = {};
-  Object.values(predictions).forEach(pos => {
-    counts[pos] = (counts[pos] || 0) + 1;
+  const divisionCounts = {};
+
+  teams.forEach(team => {
+    const prediction = normalizePrediction(predictions[team.name]);
+    const divisionKey = `${team.conference}-${team.division}`;
+    divisionCounts[divisionKey] = divisionCounts[divisionKey] || {};
+    divisionCounts[divisionKey][prediction.divisionRank] =
+      (divisionCounts[divisionKey][prediction.divisionRank] || 0) + 1;
   });
-  elements.predictionsTable.querySelectorAll('input').forEach(input => {
-    const isConflict = counts[input.value] > 1;
+
+  elements.predictionsTable.querySelectorAll('input[data-field="divisionRank"]').forEach(input => {
+    const team = teams.find(t => t.name === input.dataset.team);
+    const divisionKey = `${team.conference}-${team.division}`;
+    const isConflict = divisionCounts[divisionKey][Number(input.value)] > 1;
     input.classList.toggle('conflict', isConflict);
   });
 }
@@ -212,21 +363,48 @@ function savePredictions() {
   const user = auth.getUser(auth.currentUser);
   if (!user) return;
   const predictions = {};
+  const divisionCounts = {};
   let hasConflict = false;
-  elements.predictionsTable.querySelectorAll('input').forEach(input => {
-    predictions[input.dataset.team] = Number(input.value);
+  let invalidRecord = false;
+
+  elements.predictionsTable.querySelectorAll('tr[data-team]').forEach(row => {
+    const team = row.dataset.team;
+    const divisionKey = row.dataset.divisionKey;
+    const divisionRank = Number(row.querySelector('input[data-field="divisionRank"]').value);
+    const wins = Number(row.querySelector('input[data-field="wins"]').value);
+    const losses = Number(row.querySelector('input[data-field="losses"]').value);
+
+    predictions[team] = normalizePrediction({ divisionRank, wins, losses });
+
+    divisionCounts[divisionKey] = divisionCounts[divisionKey] || {};
+    divisionCounts[divisionKey][predictions[team].divisionRank] =
+      (divisionCounts[divisionKey][predictions[team].divisionRank] || 0) + 1;
+
+    if (predictions[team].wins + predictions[team].losses > 17) {
+      invalidRecord = true;
+    }
   });
-  const counts = {};
-  Object.values(predictions).forEach(pos => {
-    counts[pos] = (counts[pos] || 0) + 1;
-    if (counts[pos] > 1) hasConflict = true;
+
+  Object.values(divisionCounts).forEach(counts => {
+    Object.values(counts).forEach(count => {
+      if (count > 1) hasConflict = true;
+    });
   });
+
   highlightConflicts(predictions);
+
   if (hasConflict) {
-    elements.predictionStatus.textContent = 'Bitte entferne doppelte Platzierungen.';
+    elements.predictionStatus.textContent = 'Bitte vergebe jede Divisionsplatzierung nur einmal pro Division.';
     elements.predictionStatus.className = 'status error';
     return;
   }
+
+  if (invalidRecord) {
+    elements.predictionStatus.textContent = 'Die Bilanz darf maximal 17 Spiele umfassen.';
+    elements.predictionStatus.className = 'status error';
+    return;
+  }
+
   auth.updatePredictions(user.email, predictions);
   elements.predictionStatus.textContent = 'Tipps gespeichert!';
   elements.predictionStatus.className = 'status success';
