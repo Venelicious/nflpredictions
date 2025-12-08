@@ -9,7 +9,6 @@ const AVAILABLE_SEASONS = [
   { value: '2024', label: 'Saison 2024/2025 (abgeschlossen)' },
   { value: '2025', label: 'Saison 2025/2026' },
 ];
-let selectedSeason = AVAILABLE_SEASONS[0].value;
 const PREDICTION_SEASON_KEY = 'nflp_prediction_season';
 const LOCK_DATE_STORAGE_KEY = 'nflp_lock_dates';
 const GITHUB_CONFIG_KEY = 'nflp_github_sync';
@@ -193,14 +192,13 @@ const elements = {
   profileStatus: document.getElementById('profileStatus'),
   lockInfo: document.getElementById('lockInfo'),
   predictionsContent: document.getElementById('predictionsContent'),
-  predictionSeasonSelect: document.getElementById('predictionSeasonSelect'),
+  seasonPicker: document.getElementById('seasonPicker'),
   savePredictions: document.getElementById('savePredictions'),
   predictionStatus: document.getElementById('predictionStatus'),
   startNow: document.getElementById('startNow'),
   authArea: document.getElementById('authArea'),
   statsContent: document.getElementById('statsContent'),
   refreshStats: document.getElementById('refreshStats'),
-  seasonSelect: document.getElementById('seasonSelect'),
   overviewContent: document.getElementById('overviewContent'),
   overviewStatus: document.getElementById('overviewStatus'),
   lockSeasonSelect: document.getElementById('lockSeasonSelect'),
@@ -328,26 +326,16 @@ function populateTeamSelect() {
   });
 }
 
-function populateSeasonSelect() {
-  elements.seasonSelect.innerHTML = '';
+function populateSeasonPicker() {
+  if (!elements.seasonPicker) return;
+  elements.seasonPicker.innerHTML = '';
   AVAILABLE_SEASONS.forEach(season => {
     const option = document.createElement('option');
     option.value = season.value;
     option.textContent = season.label;
-    elements.seasonSelect.appendChild(option);
+    elements.seasonPicker.appendChild(option);
   });
-  elements.seasonSelect.value = selectedSeason;
-}
-
-function populatePredictionSeasonSelect() {
-  elements.predictionSeasonSelect.innerHTML = '';
-  AVAILABLE_SEASONS.forEach(season => {
-    const option = document.createElement('option');
-    option.value = season.value;
-    option.textContent = season.label;
-    elements.predictionSeasonSelect.appendChild(option);
-  });
-  elements.predictionSeasonSelect.value = predictionSeason;
+  elements.seasonPicker.value = predictionSeason;
 }
 
 function populateLockSeasonSelect() {
@@ -381,7 +369,9 @@ function updateAuthUI() {
     elements.profileName.value = user?.name || '';
     elements.profileEmail.value = user?.email || '';
     elements.profileFavorite.value = user?.favorite || '';
-    elements.predictionSeasonSelect.value = predictionSeason;
+    if (elements.seasonPicker) {
+      elements.seasonPicker.value = predictionSeason;
+    }
     if (elements.lockSeasonSelect) {
       elements.lockSeasonSelect.value = predictionSeason;
       updateLockDateForm();
@@ -752,7 +742,7 @@ function handleLockDateSave() {
   }
 }
 
-function handlePredictionSeasonChange(event) {
+function handleSeasonChange(event) {
   predictionSeason = event.target.value;
   localStorage.setItem(PREDICTION_SEASON_KEY, predictionSeason);
 
@@ -766,6 +756,7 @@ function handlePredictionSeasonChange(event) {
     updateLockDateForm();
   }
   updateLockInfo();
+  loadStats(predictionSeason);
 }
 
 function isLocked() {
@@ -979,8 +970,7 @@ function renderStats(data) {
   elements.statsContent.appendChild(container);
 }
 
-async function loadStats(season = selectedSeason) {
-  selectedSeason = season;
+async function loadStats(season = predictionSeason) {
   elements.statsContent.textContent = `Lade Daten für Saison ${season}…`;
   try {
     const response = await fetch(
@@ -1127,8 +1117,7 @@ function setupEvents() {
     })
   );
   elements.refreshStats.addEventListener('click', loadStats);
-  elements.seasonSelect.addEventListener('change', event => loadStats(event.target.value));
-  elements.predictionSeasonSelect.addEventListener('change', handlePredictionSeasonChange);
+  elements.seasonPicker?.addEventListener('change', handleSeasonChange);
   elements.githubSaveConfig?.addEventListener('click', () => {
     githubSync.save(collectGithubConfig());
     githubSync.setStatus('GitHub-Konfiguration gespeichert.', 'success');
@@ -1139,8 +1128,7 @@ function setupEvents() {
 
 function init() {
   populateTeamSelect();
-  populateSeasonSelect();
-  populatePredictionSeasonSelect();
+  populateSeasonPicker();
   populateLockSeasonSelect();
   githubSync.applyConfigToForm();
   showAuth('login');

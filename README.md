@@ -41,6 +41,14 @@
         <button class="tab-button" data-tab="overviewTab">Tipps-Übersicht</button>
       </nav>
 
+      <div class="tab-toolbar">
+        <label class="season-picker">
+          Saison:
+          <select id="seasonPicker"></select>
+        </label>
+        <p class="hint">Gilt für Tipps, Stats und Übersicht.</p>
+      </div>
+
       <div class="tab-content">
         <section id="profileTab" class="tab-pane active">
           <h2>Profil &amp; Einstellungen</h2>
@@ -130,10 +138,6 @@
               <p class="hint">Sortiere alle 32 Teams innerhalb ihrer Division (Platz 1-4) und trage deine erwartete Bilanz ein (z. B. 10-7).</p>
             </div>
             <div class="pane-actions">
-              <label class="season-picker">
-                Saison:
-                <select id="predictionSeasonSelect"></select>
-              </label>
               <div class="lock-info" id="lockInfo"></div>
             </div>
           </div>
@@ -148,10 +152,6 @@
           <div class="pane-header">
             <h2>Aktuelle NFL Statistiken</h2>
             <div class="pane-actions">
-              <label class="season-picker">
-                Saison:
-                <select id="seasonSelect"></select>
-              </label>
               <button id="refreshStats" class="secondary">Neu laden</button>
             </div>
           </div>
