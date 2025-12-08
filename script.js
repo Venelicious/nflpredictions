@@ -1254,13 +1254,14 @@ function buildOverviewScoreboard(participants) {
     <div class="hint">Punkte werden nur berechnet, wenn aktuelle Standings vorhanden sind.</div>
   `;
 
-  const columnTemplate = `repeat(${participants.length + 1}, minmax(150px, 1fr))`;
+  const columnTemplate = `repeat(${participants.length + 1}, minmax(180px, 1fr))`;
+
+  wrapper.style.setProperty('--scoreboard-columns', columnTemplate);
 
   wrapper.appendChild(header);
 
   const headerRow = document.createElement('div');
   headerRow.className = 'scoreboard__header-row scoreboard__header-row--global';
-  headerRow.style.gridTemplateColumns = columnTemplate;
 
   const standingsHeader = document.createElement('div');
   standingsHeader.className = 'scoreboard__cell scoreboard__cell--header';
@@ -1308,7 +1309,6 @@ function buildOverviewScoreboard(participants) {
 
       const bonusRow = document.createElement('div');
       bonusRow.className = 'scoreboard__row scoreboard__bonus-row';
-      bonusRow.style.gridTemplateColumns = columnTemplate;
 
       const bonusLabel = document.createElement('div');
       bonusLabel.className = 'scoreboard__cell scoreboard__cell--info';
@@ -1336,7 +1336,6 @@ function buildOverviewScoreboard(participants) {
       for (let i = 0; i < maxRows; i++) {
         const row = document.createElement('div');
         row.className = 'scoreboard__row';
-        row.style.gridTemplateColumns = columnTemplate;
 
         const actualEntry = divisionStandings[i];
         const actualCell = document.createElement('div');
