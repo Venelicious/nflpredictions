@@ -361,6 +361,36 @@ button { font-family: inherit; }
   gap: 8px;
 }
 
+.overview-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.points-badge {
+  background: #eef2ff;
+  color: var(--accent);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.division-bonus {
+  margin-top: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: #f3f4f6;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.division-bonus--earned {
+  background: rgba(15, 157, 88, 0.12);
+  color: var(--success);
+  font-weight: 700;
+}
+
 footer {
   text-align: center;
   color: var(--muted);

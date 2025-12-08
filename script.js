@@ -357,6 +357,50 @@ function renderPredictions(predictions) {
   updateSaveState();
 }
 
+function calculateTeamPoints(teamName, prediction) {
+  if (!standingsSnapshot) return null;
+  const actualStats = standingsSnapshot.teamStats[teamName];
+  const actualRank = standingsSnapshot.divisionRanks[teamName];
+  if (!actualStats || !actualRank) return null;
+
+  let points = 0;
+  if (prediction.divisionRank === actualRank) points += 1;
+  if (prediction.wins === actualStats.wins && prediction.losses === actualStats.losses) points += 1;
+  return points;
+}
+
+function calculateDivisionBonus(divisionEntries) {
+  if (!standingsSnapshot) return 0;
+  return divisionEntries.every(entry => {
+    const rank = standingsSnapshot.divisionRanks[entry.team.name];
+    return rank === entry.prediction.divisionRank;
+  })
+    ? 1
+    : 0;
+}
+
+function calculateUserTotalPoints(predictions) {
+  if (!standingsSnapshot) return null;
+  let total = 0;
+  const divisionBuckets = {};
+
+  teams.forEach(team => {
+    const prediction = normalizePrediction(predictions?.[team.name]);
+    const teamPoints = calculateTeamPoints(team.name, prediction);
+    if (typeof teamPoints === 'number') total += teamPoints;
+
+    const key = `${team.conference}-${team.division}`;
+    divisionBuckets[key] = divisionBuckets[key] || [];
+    divisionBuckets[key].push({ team, prediction });
+  });
+
+  Object.values(divisionBuckets).forEach(entries => {
+    total += calculateDivisionBonus(entries);
+  });
+
+  return total;
+}
+
 function handlePredictionChange(event) {
   const current = auth.getUser(auth.currentUser);
   if (!current) return;
@@ -518,16 +562,16 @@ function handleLogin(event) {
   }
 }
 
-function renderStats(data) {
-  if (!data || !data.children) {
-    elements.statsContent.textContent = 'Keine Daten verfügbar.';
-    return;
-  }
+let standingsSnapshot = null;
+
+function extractStandings(data) {
+  if (!data || !data.children) return null;
+
   const entries = data.children
     .filter(item => item.standings && item.standings.entries)
     .flatMap(item => item.standings.entries);
 
-  const statsMap = entries.reduce((acc, entry) => {
+  const teamStats = entries.reduce((acc, entry) => {
     const teamName = entry.team?.displayName;
     if (!teamName) return acc;
     const wins = entry.stats?.find(s => s.name === 'wins')?.value;
@@ -543,13 +587,39 @@ function renderStats(data) {
     return acc;
   }, {});
 
-  const grouped = {};
+  const divisions = {};
+  const divisionRanks = {};
+
   teams.forEach(team => {
-    grouped[team.conference] = grouped[team.conference] || {};
-    grouped[team.conference][team.division] = grouped[team.conference][team.division] || [];
-    const stats = statsMap[team.name] || { wins: 0, losses: 0, pct: -1, note: '', logo: getTeamLogo(team.name) };
-    grouped[team.conference][team.division].push({ team, stats });
+    divisions[team.conference] = divisions[team.conference] || {};
+    divisions[team.conference][team.division] = divisions[team.conference][team.division] || [];
+    const stats = teamStats[team.name] || { wins: 0, losses: 0, pct: -1, note: '', logo: getTeamLogo(team.name) };
+    divisions[team.conference][team.division].push({ team, stats });
   });
+
+  Object.values(divisions).forEach(conf => {
+    Object.values(conf).forEach(list => {
+      list.sort((a, b) => {
+        if (a.stats.pct !== b.stats.pct) return b.stats.pct - a.stats.pct;
+        return b.stats.wins - a.stats.wins;
+      });
+      list.forEach((entry, idx) => {
+        divisionRanks[entry.team.name] = idx + 1;
+      });
+    });
+  });
+
+  return { teamStats, divisions, divisionRanks };
+}
+
+function renderStats(data) {
+  const snapshot = extractStandings(data);
+  standingsSnapshot = snapshot;
+
+  if (!snapshot) {
+    elements.statsContent.textContent = 'Keine Daten verfügbar.';
+    return;
+  }
 
   const container = document.createElement('div');
   container.className = 'stats-columns';
@@ -562,10 +632,7 @@ function renderStats(data) {
     column.appendChild(heading);
 
     STAT_DIVISION_ORDER.forEach(div => {
-      const divisionTeams = (grouped[conf]?.[div] || []).sort((a, b) => {
-        if (a.stats.pct !== b.stats.pct) return b.stats.pct - a.stats.pct;
-        return b.stats.wins - a.stats.wins;
-      });
+      const divisionTeams = snapshot.divisions[conf]?.[div] || [];
 
       const division = document.createElement('div');
       division.className = 'stats-division';
@@ -623,6 +690,7 @@ async function loadStats() {
 function renderPredictionsOverview() {
   const locked = isLocked();
   elements.overviewContent.innerHTML = '';
+  const standingsAvailable = Boolean(standingsSnapshot);
 
   if (!locked) {
     elements.overviewContent.textContent = 'Die Übersicht wird nach dem Stichtag freigeschaltet.';
@@ -636,6 +704,7 @@ function renderPredictionsOverview() {
   }
 
   users.forEach(user => {
+    const totalPoints = calculateUserTotalPoints(user.predictions);
     const card = document.createElement('div');
     card.className = 'overview-card';
 
@@ -645,6 +714,7 @@ function renderPredictionsOverview() {
       <div>
         <h3>${user.name}</h3>
         <p class="stat-meta">${user.email}${user.favorite ? ` • ${user.favorite}` : ''}</p>
+        ${typeof totalPoints === 'number' ? `<p class="stat-meta">Gesamtpunkte: ${totalPoints}</p>` : ''}
       </div>
     `;
 
@@ -669,20 +739,36 @@ function renderPredictionsOverview() {
           .map(team => ({ team, prediction: normalizePrediction(user.predictions?.[team.name]) }))
           .sort((a, b) => a.prediction.divisionRank - b.prediction.divisionRank);
 
+        const divisionBonus = standingsAvailable ? calculateDivisionBonus(divisionTeams) : null;
+
         divisionTeams.forEach(entry => {
           const item = document.createElement('li');
+          const teamPoints = calculateTeamPoints(entry.team.name, entry.prediction);
+          const pointsLabel =
+            typeof teamPoints === 'number' ? `${teamPoints} Punkt${teamPoints === 1 ? '' : 'e'}` : '–';
           item.innerHTML = `
             <div class="overview-team">
               <span class="stat-rank">${entry.prediction.divisionRank}.</span>
               <img src="${getTeamLogo(entry.team.name)}" alt="${entry.team.name} Logo" class="team-logo" loading="lazy" />
               <span>${entry.team.name}</span>
             </div>
-            <span class="stat-pct">${entry.prediction.wins}-${entry.prediction.losses}</span>
+            <div class="overview-meta">
+              <span class="stat-pct">${entry.prediction.wins}-${entry.prediction.losses}</span>
+              <span class="points-badge">${pointsLabel}</span>
+            </div>
           `;
           list.appendChild(item);
         });
 
         division.appendChild(list);
+        if (standingsAvailable) {
+          const bonusRow = document.createElement('div');
+          bonusRow.className = `division-bonus ${divisionBonus ? 'division-bonus--earned' : ''}`;
+          bonusRow.textContent = divisionBonus
+            ? 'Bonus: +1 Punkt für perfekte Platzierungen'
+            : 'Bonus: 0 Punkte (Platzierungen weichen ab)';
+          division.appendChild(bonusRow);
+        }
         column.appendChild(division);
       });
 
