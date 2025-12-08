@@ -309,6 +309,46 @@ button { font-family: inherit; }
   color: var(--muted);
 }
 
+.prediction-columns {
+  gap: 20px;
+}
+
+.stats-division--editable {
+  background: #fff;
+}
+
+.prediction-list {
+  gap: 10px;
+}
+
+.prediction-row {
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.prediction-row input[type='number'] {
+  width: 72px;
+  text-align: center;
+}
+
+.prediction-team {
+  gap: 10px;
+}
+
+.prediction-team input {
+  width: 56px;
+}
+
+.prediction-record {
+  gap: 8px;
+}
+
+.prediction-record input {
+  width: 76px;
+}
+
 .stats-division__list {
   display: grid;
   gap: 8px;
