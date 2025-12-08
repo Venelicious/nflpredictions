@@ -11,6 +11,9 @@ const AVAILABLE_SEASONS = [
 ];
 const PREDICTION_SEASON_KEY = 'nflp_prediction_season';
 const LOCK_DATE_STORAGE_KEY = 'nflp_lock_dates';
+const GITHUB_CONFIG_KEY = 'nflp_github_sync';
+const CO_PLAYERS_KEY = 'nflp_co_players';
+const ACTIVE_PREDICTOR_KEY = 'nflp_active_predictor';
 let predictionSeason = localStorage.getItem(PREDICTION_SEASON_KEY) || AVAILABLE_SEASONS[0].value;
 
 const teamLogos = {
@@ -155,6 +158,68 @@ const auth = {
   }
 };
 
+const githubSync = {
+  get config() {
+    return JSON.parse(localStorage.getItem(GITHUB_CONFIG_KEY) || '{}');
+  },
+  save(config) {
+    localStorage.setItem(GITHUB_CONFIG_KEY, JSON.stringify(config));
+  },
+  setStatus(message, type = 'info') {
+    if (!elements.githubStatus) return;
+    elements.githubStatus.textContent = message;
+    elements.githubStatus.className = `status ${type === 'error' ? 'error' : type === 'success' ? 'success' : ''}`;
+  },
+  applyConfigToForm() {
+    const cfg = this.config;
+    if (!elements.githubOwner) return;
+    elements.githubOwner.value = cfg.owner || '';
+    elements.githubRepo.value = cfg.repo || '';
+    elements.githubBranch.value = cfg.branch || 'main';
+    elements.githubFile.value = cfg.file || 'data/nflpredictions.json';
+    elements.githubToken.value = cfg.token || '';
+  },
+};
+
+function readCoPlayers() {
+  return JSON.parse(localStorage.getItem(CO_PLAYERS_KEY) || '[]');
+}
+
+function saveCoPlayers(players) {
+  localStorage.setItem(CO_PLAYERS_KEY, JSON.stringify(players));
+}
+
+function ensureSeasonPredictions(entity, season = predictionSeason) {
+  const predictionsBySeason = { ...(entity.predictionsBySeason || {}) };
+  if (!predictionsBySeason[season]) {
+    predictionsBySeason[season] = defaultPredictions();
+  }
+  return predictionsBySeason;
+}
+
+function migrateCoPlayerPredictions(player, season = predictionSeason) {
+  if (!player) return defaultPredictions();
+  const predictionsBySeason = ensureSeasonPredictions(player, season);
+  const updated = readCoPlayers().map(p => (p.id === player.id ? { ...p, predictionsBySeason } : p));
+  saveCoPlayers(updated);
+  return predictionsBySeason[season];
+}
+
+function getActivePredictor() {
+  const stored = JSON.parse(localStorage.getItem(ACTIVE_PREDICTOR_KEY) || '{}');
+  if (stored.type === 'co' && readCoPlayers().some(p => p.id === stored.id)) {
+    return stored;
+  }
+  if (stored.type === 'user' && stored.id && stored.id === auth.currentUser) {
+    return stored;
+  }
+  return { type: 'user', id: auth.currentUser };
+}
+
+function setActivePredictor(predictor) {
+  localStorage.setItem(ACTIVE_PREDICTOR_KEY, JSON.stringify(predictor));
+}
+
 const elements = {
   loginForm: document.getElementById('loginForm'),
   registerForm: document.getElementById('registerForm'),
@@ -188,6 +253,17 @@ const elements = {
   lockDateInput: document.getElementById('lockDateInput'),
   lockDateStatus: document.getElementById('lockDateStatus'),
   saveLockDate: document.getElementById('saveLockDate'),
+  coPlayerSelect: document.getElementById('coPlayerSelect'),
+  addCoPlayer: document.getElementById('addCoPlayer'),
+  githubOwner: document.getElementById('githubOwner'),
+  githubRepo: document.getElementById('githubRepo'),
+  githubBranch: document.getElementById('githubBranch'),
+  githubFile: document.getElementById('githubFile'),
+  githubToken: document.getElementById('githubToken'),
+  githubSaveConfig: document.getElementById('githubSaveConfig'),
+  githubPull: document.getElementById('githubPull'),
+  githubPush: document.getElementById('githubPush'),
+  githubStatus: document.getElementById('githubStatus'),
 };
 
 function clamp(value, min, max) {
@@ -648,6 +724,111 @@ function highlightConflicts(predictions) {
   });
 }
 
+function toBase64(str) {
+  return btoa(unescape(encodeURIComponent(str)));
+}
+
+function fromBase64(str) {
+  return decodeURIComponent(escape(atob(str)));
+}
+
+function collectGithubConfig() {
+  return {
+    owner: elements.githubOwner?.value?.trim(),
+    repo: elements.githubRepo?.value?.trim(),
+    branch: elements.githubBranch?.value?.trim() || 'main',
+    file: elements.githubFile?.value?.trim() || 'data/nflpredictions.json',
+    token: elements.githubToken?.value?.trim(),
+  };
+}
+
+function githubHeaders(token) {
+  const headers = { Accept: 'application/vnd.github+json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+}
+
+async function fetchGithubFile(config) {
+  const url = `https://api.github.com/repos/${config.owner}/${config.repo}/contents/${config.file}?ref=${config.branch}`;
+  const response = await fetch(url, { headers: githubHeaders(config.token) });
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error('GitHub antwortet nicht wie erwartet.');
+  return response.json();
+}
+
+async function pullFromGithub() {
+  const config = collectGithubConfig();
+  if (!config.owner || !config.repo || !config.file) {
+    githubSync.setStatus('Bitte Owner, Repository und Dateipfad ausfüllen.', 'error');
+    return;
+  }
+
+  githubSync.save(config);
+  githubSync.setStatus('Lade Datenbank aus GitHub…');
+  try {
+    const file = await fetchGithubFile(config);
+    if (!file?.content) {
+      githubSync.setStatus('Noch keine Datenbank gefunden. Lege die Datei zuerst an.', 'error');
+      return;
+    }
+
+    const decoded = JSON.parse(fromBase64(file.content));
+    if (decoded.users) auth.users = decoded.users;
+    if (decoded.lockDates) saveLockDates(decoded.lockDates);
+    githubSync.setStatus('Datenbank geladen. Lokale Daten wurden aktualisiert.', 'success');
+
+    updateLockDateForm();
+    updateLockInfo();
+    updateAuthUI();
+  } catch (err) {
+    console.error(err);
+    githubSync.setStatus('Download fehlgeschlagen. Prüfe Token, Repository oder Rechte.', 'error');
+  }
+}
+
+async function pushToGithub() {
+  const config = collectGithubConfig();
+  if (!config.owner || !config.repo || !config.file) {
+    githubSync.setStatus('Bitte Owner, Repository und Dateipfad ausfüllen.', 'error');
+    return;
+  }
+
+  githubSync.save(config);
+  githubSync.setStatus('Lade bestehenden Stand von GitHub…');
+  try {
+    const existing = await fetchGithubFile(config);
+    const payload = {
+      message: 'Sync NFL Predictions Datenbank',
+      branch: config.branch,
+      content: toBase64(
+        JSON.stringify(
+          {
+            users: auth.users,
+            lockDates: getLockDates(),
+          },
+          null,
+          2
+        )
+      ),
+    };
+
+    if (existing?.sha) payload.sha = existing.sha;
+
+    const url = `https://api.github.com/repos/${config.owner}/${config.repo}/contents/${config.file}`;
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: { ...githubHeaders(config.token), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) throw new Error('Upload fehlgeschlagen.');
+    githubSync.setStatus('Datenbank erfolgreich nach GitHub geschrieben.', 'success');
+  } catch (err) {
+    console.error(err);
+    githubSync.setStatus('Upload fehlgeschlagen. Prüfe Token und Schreibrechte.', 'error');
+  }
+}
+
 function updateSaveState(message = '') {
   const locked = isLocked();
   elements.savePredictions.disabled = locked;
@@ -1059,33 +1240,6 @@ function buildOverviewScoreboard(participants) {
 
       const maxRows = Math.max(divisionStandings.length, divisionTeams.length);
 
-      const bonusRow = document.createElement('div');
-      bonusRow.className = 'scoreboard__row scoreboard__bonus-row';
-      bonusRow.style.gridTemplateColumns = columnTemplate;
-
-      const bonusLabel = document.createElement('div');
-      bonusLabel.className = 'scoreboard__cell scoreboard__cell--info';
-      bonusLabel.innerHTML = `
-        <div class="scoreboard__bonus-label">Perfektes Ranking</div>
-        <div class="scoreboard__bonus-hint">+1 Punkt pro Division</div>
-      `;
-      bonusRow.appendChild(bonusLabel);
-
-      userDivisionPredictions.forEach(({ entries }) => {
-        const bonus = calculateDivisionBonus(entries);
-        const cell = document.createElement('div');
-        cell.className = 'scoreboard__cell scoreboard__cell--bonus';
-        cell.innerHTML = `
-          <div class="bonus-chip ${bonus ? 'bonus-chip--active' : ''}">
-            ${bonus ? '⭐️ +1' : '–'}
-          </div>
-          <div class="bonus-chip__caption">${bonus ? 'Perfekt getippt' : 'Noch offen'}</div>
-        `;
-        bonusRow.appendChild(cell);
-      });
-
-      scoreboard.appendChild(bonusRow);
-
       for (let i = 0; i < maxRows; i++) {
         const row = document.createElement('div');
         row.className = 'scoreboard__row';
@@ -1190,12 +1344,20 @@ function setupEvents() {
   );
   elements.refreshStats.addEventListener('click', loadStats);
   elements.seasonPicker?.addEventListener('change', handleSeasonChange);
+  elements.githubSaveConfig?.addEventListener('click', () => {
+    githubSync.save(collectGithubConfig());
+    githubSync.setStatus('GitHub-Konfiguration gespeichert.', 'success');
+  });
+  elements.githubPull?.addEventListener('click', pullFromGithub);
+  elements.githubPush?.addEventListener('click', pushToGithub);
 }
 
 function init() {
   populateTeamSelect();
   populateSeasonPicker();
   populateLockSeasonSelect();
+  refreshCoPlayerSelect();
+  githubSync.applyConfigToForm();
   showAuth('login');
   setupEvents();
   if (auth.currentUser) {

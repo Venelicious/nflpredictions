@@ -101,6 +101,43 @@
               <p class="status" id="lockDateStatus"></p>
             </div>
 
+            <div class="card">
+              <h3>GitHub Sync (optionale Cloud-Datenbank)</h3>
+              <p class="hint">
+                Hinterlege ein privates Repository, um Benutzerkonten und Stichtage als JSON zu sichern und von jedem
+                Gerät zu laden. Für Schreibzugriff wird ein Personal Access Token mit dem Recht <code>repo</code> benötigt.
+              </p>
+              <div class="form-grid">
+                <label class="form-field">
+                  Besitzer / Organisation
+                  <input type="text" id="githubOwner" placeholder="z. B. dein GitHub-Benutzername">
+                </label>
+                <label class="form-field">
+                  Repository
+                  <input type="text" id="githubRepo" placeholder="z. B. nflpredictions-db">
+                </label>
+                <label class="form-field">
+                  Branch
+                  <input type="text" id="githubBranch" value="main">
+                </label>
+                <label class="form-field">
+                  Pfad zur JSON-Datei
+                  <input type="text" id="githubFile" value="data/nflpredictions.json">
+                </label>
+                <label class="form-field">
+                  Personal Access Token (wird lokal gespeichert)
+                  <input type="password" id="githubToken" autocomplete="off">
+                </label>
+              </div>
+              <div class="actions actions--stacked">
+                <button id="githubSaveConfig" type="button">Konfiguration speichern</button>
+                <div class="action-row">
+                  <button id="githubPull" type="button" class="secondary">Aus GitHub laden</button>
+                  <button id="githubPush" type="button">Nach GitHub hochladen</button>
+                </div>
+              </div>
+              <p class="status" id="githubStatus"></p>
+            </div>
           </div>
         </section>
 
@@ -152,7 +189,7 @@
   </main>
 
   <footer>
-    <p>Deine Daten bleiben vollständig lokal gespeichert.</p>
+    <p>Deine Daten bleiben lokal gespeichert; optional kannst du eine gesicherte JSON-Datenbank in deinem GitHub-Repo verwenden.</p>
   </footer>
 
   <script src="script.js"></script>
