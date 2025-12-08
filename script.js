@@ -1201,6 +1201,13 @@ function listParticipants() {
   return [...users, ...coPlayers];
 }
 
+function hasNonZeroRecord(predictions) {
+  return Object.values(predictions || {}).some(entry => {
+    const { wins, losses } = normalizePrediction(entry);
+    return wins + losses > 0;
+  });
+}
+
 function renderPredictionsOverview() {
   const locked = isLocked();
   elements.overviewContent.innerHTML = '';
@@ -1211,7 +1218,12 @@ function renderPredictionsOverview() {
     return;
   }
 
-  const participants = listParticipants();
+  const participants = listParticipants().filter(player => {
+    const name = (player.name || '').trim();
+    if (name === 'DU' || name === 'Venelicious') return false;
+    return hasNonZeroRecord(getParticipantPredictions(player));
+  });
+
   if (!participants.length) {
     elements.overviewContent.textContent = 'Noch keine Benutzer vorhanden.';
     return;
