@@ -1539,8 +1539,6 @@ function buildOverviewScoreboard(participants, options = {}) {
   if (!standingsSnapshot) return null;
 
   const title = options.title || 'Scoreboard';
-  const subtitle = options.subtitle ?? 'Vergleich der tatsächlichen Standings mit allen Tipps.';
-  const hint = options.hint ?? 'Punkte werden nur berechnet, wenn aktuelle Standings vorhanden sind.';
 
   const wrapper = document.createElement('div');
   wrapper.className = 'overview-scoreboard';
