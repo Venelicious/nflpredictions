@@ -1472,6 +1472,12 @@ function handleOverviewPdfExport() {
     return;
   }
 
+  const exportWindow = window.open('', '_blank', 'noopener');
+  if (!exportWindow) {
+    elements.overviewStatus.textContent = 'Popup für den PDF-Export konnte nicht geöffnet werden.';
+    return;
+  }
+
   const participantGroups = chunkParticipants(participants, 6);
   const container = document.createElement('div');
 
@@ -1500,12 +1506,7 @@ function handleOverviewPdfExport() {
 
   if (!container.childElementCount) {
     elements.overviewStatus.textContent = 'Keine Daten für den Export gefunden.';
-    return;
-  }
-
-  const exportWindow = window.open('', '_blank', 'noopener');
-  if (!exportWindow) {
-    elements.overviewStatus.textContent = 'Popup für den PDF-Export konnte nicht geöffnet werden.';
+    exportWindow.close();
     return;
   }
 
