@@ -1539,7 +1539,7 @@ function handleOverviewPdfExport() {
 function buildOverviewScoreboard(participants, options = {}) {
   if (!standingsSnapshot) return null;
 
-  const title = options.title || 'Scoreboard';
+  const { title = 'Scoreboard', subtitle = '', hint = '' } = options;
 
   const wrapper = document.createElement('div');
   wrapper.className = 'overview-scoreboard';
