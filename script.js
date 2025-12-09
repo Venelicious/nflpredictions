@@ -204,6 +204,7 @@ const elements = {
   overviewContent: document.getElementById('overviewContent'),
   overviewStatus: document.getElementById('overviewStatus'),
   exportCsv: document.getElementById('exportCsv'),
+  exportPdf: document.getElementById('exportPdf'),
   tableImport: document.getElementById('tableImport'),
   importStatus: document.getElementById('importStatus'),
   importTableBtn: document.getElementById('importTableBtn'),
@@ -1322,22 +1323,33 @@ function getOverviewParticipants() {
   });
 }
 
-function updateOverviewExportButton(locked, participants) {
-  if (!elements.exportCsv) return;
+function updateOverviewExportButtons(locked, participants) {
   const hasParticipants = (participants || []).length > 0;
-  elements.exportCsv.disabled = !locked || !hasParticipants;
-  elements.exportCsv.title = !locked
-    ? 'Export nach Erreichen des Stichtags verfügbar'
-    : hasParticipants
-      ? ''
-      : 'Keine Tipps zum Exportieren vorhanden';
+
+  if (elements.exportCsv) {
+    elements.exportCsv.disabled = !locked || !hasParticipants;
+    elements.exportCsv.title = !locked
+      ? 'Export nach Erreichen des Stichtags verfügbar'
+      : hasParticipants
+        ? ''
+        : 'Keine Tipps zum Exportieren vorhanden';
+  }
+
+  if (elements.exportPdf) {
+    elements.exportPdf.disabled = !locked || !hasParticipants;
+    elements.exportPdf.title = !locked
+      ? 'Export nach Erreichen des Stichtags verfügbar'
+      : hasParticipants
+        ? 'Öffnet eine druckbare PDF-Ansicht des Scoreboards'
+        : 'Keine Tipps zum Exportieren vorhanden';
+  }
 }
 
 function renderPredictionsOverview() {
   const locked = isLocked();
   elements.overviewContent.innerHTML = '';
   const participants = getOverviewParticipants();
-  updateOverviewExportButton(locked, participants);
+  updateOverviewExportButtons(locked, participants);
   const standingsAvailable = Boolean(standingsSnapshot);
 
   if (!locked) {
@@ -1399,7 +1411,7 @@ function buildOverviewCsvRows(participants) {
 function handleOverviewExport() {
   const locked = isLocked();
   const participants = getOverviewParticipants();
-  updateOverviewExportButton(locked, participants);
+  updateOverviewExportButtons(locked, participants);
 
   if (!locked) {
     elements.overviewStatus.textContent = 'Export steht erst nach dem Stichtag zur Verfügung.';
@@ -1432,8 +1444,97 @@ function handleOverviewExport() {
   elements.overviewStatus.textContent = 'CSV-Export erstellt.';
 }
 
-function buildOverviewScoreboard(participants) {
+function chunkParticipants(participants, chunkSize = 6) {
+  const chunks = [];
+  for (let i = 0; i < participants.length; i += chunkSize) {
+    chunks.push(participants.slice(i, i + chunkSize));
+  }
+  return chunks;
+}
+
+function handleOverviewPdfExport() {
+  const locked = isLocked();
+  const participants = getOverviewParticipants();
+  updateOverviewExportButtons(locked, participants);
+
+  if (!locked) {
+    elements.overviewStatus.textContent = 'Export steht erst nach dem Stichtag zur Verfügung.';
+    return;
+  }
+
+  if (!participants.length) {
+    elements.overviewStatus.textContent = 'Keine Tipps vorhanden, die exportiert werden können.';
+    return;
+  }
+
+  if (!standingsSnapshot) {
+    elements.overviewStatus.textContent = 'Aktuelle Standings fehlen für den Scoreboard-Export.';
+    return;
+  }
+
+  const participantGroups = chunkParticipants(participants, 6);
+  const container = document.createElement('div');
+
+  participantGroups.forEach((group, index) => {
+    const sheet = document.createElement('section');
+    sheet.className = 'print-sheet';
+
+    const header = document.createElement('div');
+    header.className = 'print-sheet__header';
+    const playerNames = group.map(player => player.name).join(', ') || 'Unbekannte Spieler';
+    header.innerHTML = `
+      <div>
+        <h2 class="print-sheet__title">Scoreboard – Gruppe ${index + 1}</h2>
+        <p class="print-sheet__players">${playerNames}</p>
+      </div>
+      <p class="print-sheet__meta">Maximal 6 Spieler pro Seite</p>
+    `;
+
+    const scoreboard = buildOverviewScoreboard(group);
+    if (scoreboard) {
+      sheet.appendChild(header);
+      sheet.appendChild(scoreboard);
+      container.appendChild(sheet);
+    }
+  });
+
+  if (!container.childElementCount) {
+    elements.overviewStatus.textContent = 'Keine Daten für den Export gefunden.';
+    return;
+  }
+
+  const exportWindow = window.open('', '_blank', 'noopener');
+  if (!exportWindow) {
+    elements.overviewStatus.textContent = 'Popup für den PDF-Export konnte nicht geöffnet werden.';
+    return;
+  }
+
+  exportWindow.document.write(`
+    <!doctype html>
+    <html lang="de">
+      <head>
+        <meta charset="utf-8" />
+        <title>Scoreboard Export</title>
+        <link rel="stylesheet" href="styles.css" />
+      </head>
+      <body>
+        ${container.innerHTML}
+      </body>
+    </html>
+  `);
+  exportWindow.document.close();
+  exportWindow.focus();
+  exportWindow.print();
+
+  elements.overviewStatus.textContent = 'PDF-Export vorbereitet. Bitte Druckdialog prüfen.';
+}
+
+function buildOverviewScoreboard(participants, options = {}) {
   if (!standingsSnapshot) return null;
+
+  const title = options.title || 'Scoreboard';
+  const subtitle = options.subtitle ?? 'Vergleich der tatsächlichen Standings mit allen Tipps.';
+  const hint = options.hint ?? 'Punkte werden nur berechnet, wenn aktuelle Standings vorhanden sind.';
 
   const wrapper = document.createElement('div');
   wrapper.className = 'overview-scoreboard';
@@ -1442,10 +1543,10 @@ function buildOverviewScoreboard(participants) {
   header.className = 'overview-scoreboard__header';
   header.innerHTML = `
     <div>
-      <h3 style="margin: 0;">Scoreboard</h3>
-      <p class="stat-meta" style="margin: 4px 0 0;">Vergleich der tatsächlichen Standings mit allen Tipps.</p>
+      <h3 style="margin: 0;">${title}</h3>
+      ${subtitle ? `<p class="stat-meta" style="margin: 4px 0 0;">${subtitle}</p>` : ''}
     </div>
-    <div class="hint">Punkte werden nur berechnet, wenn aktuelle Standings vorhanden sind.</div>
+    ${hint ? `<div class="hint">${hint}</div>` : ''}
   `;
 
   const columnTemplate = `repeat(${participants.length + 1}, minmax(255px, 1fr))`;
@@ -1658,6 +1759,7 @@ function setupEvents() {
   elements.seasonPicker?.addEventListener('change', handleSeasonChange);
   elements.importTableBtn?.addEventListener('click', handleTableImport);
   elements.exportCsv?.addEventListener('click', handleOverviewExport);
+  elements.exportPdf?.addEventListener('click', handleOverviewPdfExport);
 }
 
 function init() {
