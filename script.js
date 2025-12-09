@@ -1063,7 +1063,38 @@ function handleLogin(event) {
 
 let standingsSnapshot = null;
 
-function extractStandings(data) {
+function buildStandingsSnapshot(teamStats) {
+  const divisions = {};
+  const divisionRanks = {};
+  const mergedStats = {};
+
+  teams.forEach(team => {
+    divisions[team.conference] = divisions[team.conference] || {};
+    divisions[team.conference][team.division] = divisions[team.conference][team.division] || [];
+
+    const fallback = { wins: 0, losses: 0, pct: -1, note: '', logo: getTeamLogo(team.name) };
+    const stats = { ...fallback, ...(teamStats[team.name] || {}) };
+    mergedStats[team.name] = stats;
+
+    divisions[team.conference][team.division].push({ team, stats });
+  });
+
+  Object.values(divisions).forEach(conf => {
+    Object.values(conf).forEach(list => {
+      list.sort((a, b) => {
+        if (a.stats.pct !== b.stats.pct) return b.stats.pct - a.stats.pct;
+        return b.stats.wins - a.stats.wins;
+      });
+      list.forEach((entry, idx) => {
+        divisionRanks[entry.team.name] = idx + 1;
+      });
+    });
+  });
+
+  return { teamStats: mergedStats, divisions, divisionRanks };
+}
+
+function extractEspnStandings(data) {
   if (!data || !data.children) return null;
 
   const entries = data.children
@@ -1086,29 +1117,67 @@ function extractStandings(data) {
     return acc;
   }, {});
 
-  const divisions = {};
-  const divisionRanks = {};
+  return buildStandingsSnapshot(teamStats);
+}
 
-  teams.forEach(team => {
-    divisions[team.conference] = divisions[team.conference] || {};
-    divisions[team.conference][team.division] = divisions[team.conference][team.division] || [];
-    const stats = teamStats[team.name] || { wins: 0, losses: 0, pct: -1, note: '', logo: getTeamLogo(team.name) };
-    divisions[team.conference][team.division].push({ team, stats });
-  });
+function extractNflStandings(data) {
+  const records = data?.teamRecords || data?.league?.teamRecords || data?.records;
+  if (!Array.isArray(records)) return null;
 
-  Object.values(divisions).forEach(conf => {
-    Object.values(conf).forEach(list => {
-      list.sort((a, b) => {
-        if (a.stats.pct !== b.stats.pct) return b.stats.pct - a.stats.pct;
-        return b.stats.wins - a.stats.wins;
-      });
-      list.forEach((entry, idx) => {
-        divisionRanks[entry.team.name] = idx + 1;
-      });
-    });
-  });
+  const teamStats = records.reduce((acc, record) => {
+    const teamInfo = record.team || record.club || record;
+    const teamLabel =
+      teamInfo?.fullName ||
+      teamInfo?.name ||
+      teamInfo?.teamName ||
+      teamInfo?.displayName ||
+      `${teamInfo?.city || ''} ${teamInfo?.nickName || ''}`.trim();
+    const teamName = findTeamByLabel(teamLabel);
+    if (!teamName) return acc;
 
-  return { teamStats, divisions, divisionRanks };
+    const wins =
+      record.overallWins ??
+      record.wins ??
+      record.record?.wins ??
+      record.overall?.wins ??
+      record.overallRecord?.wins;
+    const losses =
+      record.overallLosses ??
+      record.losses ??
+      record.record?.losses ??
+      record.overall?.losses ??
+      record.overallRecord?.losses;
+    const pct =
+      record.overallWinPct ??
+      record.pct ??
+      record.winPct ??
+      record.overall?.percentage ??
+      record.overallRecord?.percentage ??
+      (typeof wins === 'number' && typeof losses === 'number' && wins + losses > 0
+        ? wins / (wins + losses)
+        : -1);
+
+    acc[teamName] = {
+      wins: typeof wins === 'number' ? wins : 0,
+      losses: typeof losses === 'number' ? losses : 0,
+      pct: typeof pct === 'number' ? pct : -1,
+      note: record.note || record.clinched || '',
+      logo: getTeamLogo(teamName),
+    };
+    return acc;
+  }, {});
+
+  if (!Object.keys(teamStats).length) return null;
+  return buildStandingsSnapshot(teamStats);
+}
+
+function extractStandings(data) {
+  const parsers = [extractNflStandings, extractEspnStandings];
+  for (const parser of parsers) {
+    const snapshot = parser(data);
+    if (snapshot) return snapshot;
+  }
+  return null;
 }
 
 function renderStats(data) {
@@ -1176,11 +1245,26 @@ function renderStats(data) {
 async function loadStats(season = predictionSeason) {
   elements.statsContent.textContent = `Lade Daten für Saison ${season}…`;
   try {
-    const response = await fetch(
+    const nflResponse = await fetch(
+      'https://static.www.nfl.com/liveupdate/scorestrip/standings.json',
+      { cache: 'no-cache' }
+    );
+    if (nflResponse.ok) {
+      const data = await nflResponse.json();
+      renderStats(data);
+      renderPredictionsOverview();
+      return;
+    }
+  } catch (err) {
+    console.warn('NFL Standings konnten nicht geladen werden, fallback zu ESPN.', err);
+  }
+
+  try {
+    const espnResponse = await fetch(
       `https://site.api.espn.com/apis/v2/sports/football/nfl/standings?season=${season}`
     );
-    if (!response.ok) throw new Error('Fehler beim Abrufen.');
-    const data = await response.json();
+    if (!espnResponse.ok) throw new Error('Fehler beim Abrufen.');
+    const data = await espnResponse.json();
     renderStats(data);
     renderPredictionsOverview();
   } catch (err) {
@@ -1261,63 +1345,31 @@ function escapeCsvValue(value) {
 }
 
 function buildOverviewCsvRows(participants) {
-  const headers = [
-    'Conference',
-    'Division',
-    'Team',
-    'Aktueller Rang',
-    'Aktuelle Siege',
-    'Aktuelle Niederlagen',
-  ];
-
-  participants.forEach(player => {
-    const name = player.name || 'Unbekannt';
-    headers.push(`${name}: Rang`, `${name}: Siege`, `${name}: Niederlagen`, `${name}: Punkte`);
-  });
-
+  const headers = ['Team', ...participants.map(player => player.name || 'Unbekannt')];
   const rows = [headers];
 
-  CONFERENCE_ORDER.forEach(conf => {
-    STAT_DIVISION_ORDER.forEach(div => {
-      const divisionStandings = standingsSnapshot?.divisions?.[conf]?.[div] || [];
-      const divisionTeams = teams
-        .filter(team => team.conference === conf && team.division === div)
-        .sort((a, b) => {
-          const rankA = standingsSnapshot?.divisionRanks?.[a.name] ?? Number.POSITIVE_INFINITY;
-          const rankB = standingsSnapshot?.divisionRanks?.[b.name] ?? Number.POSITIVE_INFINITY;
-          if (rankA !== rankB) return rankA - rankB;
-          return a.name.localeCompare(b.name);
-        });
+  const orderedTeams = sortTeams();
 
-      divisionTeams.forEach(team => {
-        const actualIndex = divisionStandings.findIndex(entry => entry.team.name === team.name);
-        const actualRank = actualIndex >= 0 ? actualIndex + 1 : '';
-        const actualStats = standingsSnapshot?.teamStats?.[team.name];
+  orderedTeams.forEach(team => {
+    const baseRow = [team.name];
 
-        const baseRow = [
-          conf,
-          div,
-          team.name,
-          actualRank,
-          actualStats?.wins ?? '',
-          actualStats?.losses ?? '',
-        ];
-
-        participants.forEach(player => {
-          const predictions = getParticipantPredictions(player);
-          const normalized = normalizePrediction(predictions?.[team.name]);
-          const points = calculateTeamPoints(team.name, normalized);
-          baseRow.push(
-            normalized.divisionRank ?? '',
-            normalized.wins ?? '',
-            normalized.losses ?? '',
-            typeof points === 'number' ? points : ''
-          );
-        });
-
-        rows.push(baseRow);
-      });
+    participants.forEach(player => {
+      const predictions = getParticipantPredictions(player);
+      const rawPrediction = predictions?.[team.name];
+      if (
+        rawPrediction &&
+        !Number.isNaN(Number(rawPrediction.divisionRank)) &&
+        !Number.isNaN(Number(rawPrediction.wins)) &&
+        !Number.isNaN(Number(rawPrediction.losses))
+      ) {
+        const normalized = normalizePrediction(rawPrediction);
+        baseRow.push(`${normalized.divisionRank} (${normalized.wins}-${normalized.losses})`);
+      } else {
+        baseRow.push('');
+      }
     });
+
+    rows.push(baseRow);
   });
 
   return rows;
