@@ -1452,6 +1452,54 @@ function chunkParticipants(participants, chunkSize = 6) {
   return chunks;
 }
 
+function formatPredictionForExport(rawPrediction) {
+  if (!rawPrediction) return '–';
+  const prediction = normalizePrediction(rawPrediction);
+  const rank = Number.isFinite(prediction.divisionRank) ? prediction.divisionRank : '–';
+  const wins = Number.isFinite(prediction.wins) ? prediction.wins : '–';
+  const losses = Number.isFinite(prediction.losses) ? prediction.losses : '–';
+  return `${rank} (${wins}-${losses})`;
+}
+
+function buildOverviewPdfRows(participants) {
+  const rows = [];
+
+  CONFERENCE_ORDER.forEach(conf => {
+    STAT_DIVISION_ORDER.forEach(div => {
+      const divisionStandings = standingsSnapshot?.divisions?.[conf]?.[div] || [];
+      const divisionTeams = divisionStandings.length
+        ? divisionStandings.map(entry => entry.team.name)
+        : teams.filter(team => team.conference === conf && team.division === div).map(team => team.name);
+
+      let isFirstRow = true;
+
+      divisionTeams.forEach((teamName, idx) => {
+        const standingsEntry = divisionStandings[idx];
+        const recordLabel = standingsEntry
+          ? `${standingsEntry.stats.wins}-${standingsEntry.stats.losses}`
+          : '';
+
+        const row = [
+          isFirstRow ? `${conf} ${div}` : '',
+          recordLabel ? `${teamName} (${recordLabel})` : teamName,
+        ];
+
+        participants.forEach(player => {
+          const predictions = getParticipantPredictions(player);
+          row.push(formatPredictionForExport(predictions?.[teamName]));
+        });
+
+        rows.push(row);
+        isFirstRow = false;
+      });
+
+      if (divisionTeams.length) rows.push(Array(participants.length + 2).fill(''));
+    });
+  });
+
+  return rows;
+}
+
 function handleOverviewPdfExport() {
   const locked = isLocked();
   const participants = getOverviewParticipants();
@@ -1472,68 +1520,50 @@ function handleOverviewPdfExport() {
     return;
   }
 
-  const exportWindow = window.open('', '_blank', 'noopener');
-  if (!exportWindow) {
-    elements.overviewStatus.textContent = 'Popup für den PDF-Export konnte nicht geöffnet werden.';
+  const pdfLib = window.jspdf;
+  if (!pdfLib || !pdfLib.jsPDF) {
+    elements.overviewStatus.textContent = 'jsPDF konnte nicht geladen werden.';
     return;
   }
 
+  const { jsPDF } = pdfLib;
   const participantGroups = chunkParticipants(participants, 6);
-  const container = document.createElement('div');
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'pt' });
+  const margin = 32;
 
   participantGroups.forEach((group, index) => {
-    const sheet = document.createElement('section');
-    sheet.className = 'print-sheet';
+    if (index > 0) doc.addPage();
 
-    const header = document.createElement('div');
-    header.className = 'print-sheet__header';
-    const playerNames = group.map(player => player.name).join(', ') || 'Unbekannte Spieler';
-    header.innerHTML = `
-      <div>
-        <h2 class="print-sheet__title">Scoreboard – Gruppe ${index + 1}</h2>
-        <p class="print-sheet__players">${playerNames}</p>
-      </div>
-      <p class="print-sheet__meta">Maximal 6 Spieler pro Seite</p>
-    `;
+    doc.setFontSize(16);
+    doc.text(`NFL Predictions – Scoreboard ${predictionSeason}`, margin, margin);
 
-    const scoreboard = buildOverviewScoreboard(group);
-    if (scoreboard) {
-      sheet.appendChild(header);
-      sheet.appendChild(scoreboard);
-      container.appendChild(sheet);
-    }
+    doc.setFontSize(11);
+    const playerNames = group.map(p => p.name).join(', ');
+    doc.text(`Spieler: ${playerNames}`, margin, margin + 18);
+    doc.text('Maximal 6 Spieler pro Seite', margin, margin + 34);
+
+    const head = [
+      ['Conference/Division', 'Team', ...group.map(player => player.name || '–')],
+    ];
+
+    const body = buildOverviewPdfRows(group);
+
+    doc.autoTable({
+      head,
+      body,
+      startY: margin + 48,
+      styles: { fontSize: 8, cellPadding: 4 },
+      headStyles: { fillColor: [20, 46, 77], textColor: 255 },
+      alternateRowStyles: { fillColor: [245, 248, 252] },
+      columnStyles: {
+        0: { cellWidth: 110 },
+        1: { cellWidth: 190 },
+      },
+    });
   });
 
-  if (!container.childElementCount) {
-    elements.overviewStatus.textContent = 'Keine Daten für den Export gefunden.';
-    exportWindow.close();
-    return;
-  }
-
-  const baseHref = `${document.location.origin}${document.location.pathname.replace(/[^/]*$/, '')}`;
-
-  exportWindow.document.write(`
-    <!doctype html>
-    <html lang="de">
-      <head>
-        <meta charset="utf-8" />
-        <title>Scoreboard Export</title>
-        <base href="${baseHref}">
-        <link rel="stylesheet" href="styles.css" />
-      </head>
-      <body>
-        ${container.innerHTML}
-      </body>
-    </html>
-  `);
-  exportWindow.document.close();
-
-  exportWindow.addEventListener('load', () => {
-    exportWindow.focus();
-    exportWindow.print();
-  });
-
-  elements.overviewStatus.textContent = 'PDF-Export vorbereitet. Bitte Druckdialog prüfen.';
+  doc.save(`nfl-predictions-scoreboard-${predictionSeason}.pdf`);
+  elements.overviewStatus.textContent = 'PDF-Export wurde erstellt.';
 }
 
 function buildOverviewScoreboard(participants, options = {}) {
