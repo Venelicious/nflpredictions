@@ -253,6 +253,14 @@ function defaultPredictions() {
   }, {});
 }
 
+function sortByName(list) {
+  return [...list].sort((a, b) => {
+    const nameA = (a?.name || a?.email || '').toLowerCase();
+    const nameB = (b?.name || b?.email || '').toLowerCase();
+    return nameA.localeCompare(nameB, 'de');
+  });
+}
+
 function readCoPlayers() {
   return JSON.parse(localStorage.getItem(CO_PLAYER_STORAGE_KEY) || '[]');
 }
@@ -497,25 +505,38 @@ function populateLockSeasonSelect() {
 
 function refreshCoPlayerSelect() {
   if (!elements.coPlayerSelect) return;
-  const coPlayers = readCoPlayers();
   const active = getActivePredictor();
 
-  elements.coPlayerSelect.innerHTML = '';
+  const options = [];
 
   if (auth.currentUser) {
     const currentUser = auth.getUser(auth.currentUser);
-    const userOption = document.createElement('option');
-    userOption.value = `user:${auth.currentUser}`;
-    userOption.textContent = currentUser ? `Du (${currentUser.name || currentUser.email})` : 'Eigenes Profil';
-    elements.coPlayerSelect.appendChild(userOption);
+    const baseName = currentUser ? currentUser.name || currentUser.email : 'Eigenes Profil';
+    options.push({
+      value: `user:${auth.currentUser}`,
+      label: currentUser ? `Du (${baseName})` : 'Eigenes Profil',
+      sortKey: (baseName || '').toLowerCase(),
+    });
   }
 
-  coPlayers.forEach(player => {
-    const option = document.createElement('option');
-    option.value = `co:${player.id}`;
-    option.textContent = player.name || 'Mitspieler';
-    elements.coPlayerSelect.appendChild(option);
+  sortByName(readCoPlayers()).forEach(player => {
+    options.push({
+      value: `co:${player.id}`,
+      label: player.name || 'Mitspieler',
+      sortKey: (player.name || '').toLowerCase(),
+    });
   });
+
+  elements.coPlayerSelect.innerHTML = '';
+
+  options
+    .sort((a, b) => a.sortKey.localeCompare(b.sortKey, 'de'))
+    .forEach(entry => {
+      const option = document.createElement('option');
+      option.value = entry.value;
+      option.textContent = entry.label;
+      elements.coPlayerSelect.appendChild(option);
+    });
 
   const preferredValue = `${active.type}:${active.id}`;
   const hasPreferred = Array.from(elements.coPlayerSelect.options).some(opt => opt.value === preferredValue);
@@ -1283,7 +1304,7 @@ function getParticipantPredictions(participant) {
 function listParticipants() {
   const users = auth.users || [];
   const coPlayers = readCoPlayers();
-  return [...users, ...coPlayers];
+  return sortByName([...users, ...coPlayers]);
 }
 
 function hasNonZeroRecord(predictions) {
