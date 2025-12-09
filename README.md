@@ -161,6 +161,7 @@
             </div>
             <div class="pane-actions">
               <button id="exportCsv" class="secondary">CSV exportieren</button>
+              <button id="exportPdf" class="secondary">Scoreboard als PDF</button>
             </div>
           </div>
           <div id="overviewContent" class="card"></div>

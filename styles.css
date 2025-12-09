@@ -714,6 +714,59 @@ button { font-family: inherit; }
   color: var(--muted);
 }
 
+.print-sheet {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow);
+  page-break-after: always;
+}
+
+.print-sheet:last-of-type {
+  page-break-after: auto;
+}
+
+.print-sheet__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.print-sheet__title {
+  margin: 0;
+}
+
+.print-sheet__meta,
+.print-sheet__players {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.print-sheet .overview-scoreboard {
+  overflow: visible;
+  box-shadow: none;
+}
+
+@page {
+  size: A4 landscape;
+  margin: 12mm;
+}
+
+@media print {
+  body {
+    background: #fff;
+  }
+
+  .print-sheet {
+    box-shadow: none;
+  }
+}
+
 .import-card textarea {
   width: 100%;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
