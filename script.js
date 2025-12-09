@@ -1308,10 +1308,18 @@ function listParticipants() {
   return sortByName([...users, ...coPlayers]);
 }
 
-function hasNonZeroRecord(predictions) {
-  return Object.values(predictions || {}).some(entry => {
-    const { wins, losses } = normalizePrediction(entry);
-    return wins + losses > 0;
+function hasMeaningfulPredictions(predictions) {
+  const baseline = defaultPredictions();
+
+  return Object.entries(predictions || {}).some(([team, entry]) => {
+    const normalized = normalizePrediction(entry);
+    const defaultEntry = normalizePrediction(baseline[team]);
+
+    return (
+      normalized.divisionRank !== defaultEntry.divisionRank ||
+      normalized.wins !== defaultEntry.wins ||
+      normalized.losses !== defaultEntry.losses
+    );
   });
 }
 
@@ -1319,7 +1327,7 @@ function getOverviewParticipants() {
   return listParticipants().filter(player => {
     const name = (player.name || '').trim();
     if (name === 'DU' || name === 'Venelicious') return false;
-    return hasNonZeroRecord(getParticipantPredictions(player));
+    return hasMeaningfulPredictions(getParticipantPredictions(player));
   });
 }
 
