@@ -599,7 +599,7 @@ button { font-family: inherit; }
 .scoreboard__row,
 .scoreboard__header-row {
   display: grid;
-  grid-template-columns: var(--scoreboard-columns, repeat(auto-fit, minmax(180px, 1fr)));
+  grid-template-columns: var(--scoreboard-columns, repeat(auto-fit, minmax(240px, 1fr)));
   gap: 6px;
   padding: 8px 10px;
   align-items: stretch;
