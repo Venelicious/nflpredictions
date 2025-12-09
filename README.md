@@ -50,7 +50,6 @@
         <div class="coplayer-picker">
           <div class="coplayer-picker__header">
             <span class="coplayer-picker__label">Mitspieler</span>
-            <p class="hint">Wähle, wessen Tipps du bearbeiten möchtest.</p>
           </div>
           <div class="coplayer-picker__controls">
             <select id="coPlayerSelect"></select>
@@ -59,7 +58,6 @@
             <button id="deleteCoPlayer" type="button" class="secondary danger">Mitspieler löschen</button>
           </div>
         </div>
-        <p class="hint">Gilt für Tipps, Stats und Übersicht.</p>
       </div>
 
       <div class="tab-content">
@@ -89,7 +87,6 @@
 
             <div class="card">
               <h3>Saison-Stichtage</h3>
-              <p class="hint">Speichere für jede Saison ein eigenes Datum, ab dem Tipps schreibgeschützt sind.</p>
               <div class="form-grid">
                 <label class="form-field">
                   Saison
@@ -111,7 +108,6 @@
           <div class="pane-header">
             <div>
               <h2>Tipps für jede Division (17 Spieltage)</h2>
-              <p class="hint">Sortiere alle 32 Teams innerhalb ihrer Division (Platz 1-4) und trage deine erwartete Bilanz ein (z. B. 10-7).</p>
             </div>
             <div class="pane-actions">
               <div class="lock-info" id="lockInfo"></div>
@@ -137,7 +133,6 @@
         <section id="importTab" class="tab-pane">
           <div class="pane-header">
             <h2>Ranking-Tabelle importieren</h2>
-            <p class="hint">Füge die Tabelle aus CSV oder Excel ein, um mehrere Mitspieler auf einmal zu übernehmen.</p>
           </div>
           <div class="card import-card">
             <p class="hint">
@@ -180,7 +175,6 @@
   </main>
 
   <footer>
-    <p>Deine Daten bleiben vollständig lokal gespeichert.</p>
   </footer>
 
   <script src="script.js"></script>
