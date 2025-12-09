@@ -1509,12 +1509,15 @@ function handleOverviewPdfExport() {
     return;
   }
 
+  const baseHref = `${document.location.origin}${document.location.pathname.replace(/[^/]*$/, '')}`;
+
   exportWindow.document.write(`
     <!doctype html>
     <html lang="de">
       <head>
         <meta charset="utf-8" />
         <title>Scoreboard Export</title>
+        <base href="${baseHref}">
         <link rel="stylesheet" href="styles.css" />
       </head>
       <body>
@@ -1523,8 +1526,11 @@ function handleOverviewPdfExport() {
     </html>
   `);
   exportWindow.document.close();
-  exportWindow.focus();
-  exportWindow.print();
+
+  exportWindow.addEventListener('load', () => {
+    exportWindow.focus();
+    exportWindow.print();
+  });
 
   elements.overviewStatus.textContent = 'PDF-Export vorbereitet. Bitte Druckdialog prüfen.';
 }
