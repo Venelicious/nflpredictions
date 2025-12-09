@@ -203,6 +203,7 @@ const elements = {
   refreshStats: document.getElementById('refreshStats'),
   overviewContent: document.getElementById('overviewContent'),
   overviewStatus: document.getElementById('overviewStatus'),
+  exportCsv: document.getElementById('exportCsv'),
   tableImport: document.getElementById('tableImport'),
   importStatus: document.getElementById('importStatus'),
   importTableBtn: document.getElementById('importTableBtn'),
@@ -1208,21 +1209,36 @@ function hasNonZeroRecord(predictions) {
   });
 }
 
+function getOverviewParticipants() {
+  return listParticipants().filter(player => {
+    const name = (player.name || '').trim();
+    if (name === 'DU' || name === 'Venelicious') return false;
+    return hasNonZeroRecord(getParticipantPredictions(player));
+  });
+}
+
+function updateOverviewExportButton(locked, participants) {
+  if (!elements.exportCsv) return;
+  const hasParticipants = (participants || []).length > 0;
+  elements.exportCsv.disabled = !locked || !hasParticipants;
+  elements.exportCsv.title = !locked
+    ? 'Export nach Erreichen des Stichtags verfügbar'
+    : hasParticipants
+      ? ''
+      : 'Keine Tipps zum Exportieren vorhanden';
+}
+
 function renderPredictionsOverview() {
   const locked = isLocked();
   elements.overviewContent.innerHTML = '';
+  const participants = getOverviewParticipants();
+  updateOverviewExportButton(locked, participants);
   const standingsAvailable = Boolean(standingsSnapshot);
 
   if (!locked) {
     elements.overviewContent.textContent = 'Die Übersicht wird nach dem Stichtag freigeschaltet.';
     return;
   }
-
-  const participants = listParticipants().filter(player => {
-    const name = (player.name || '').trim();
-    if (name === 'DU' || name === 'Venelicious') return false;
-    return hasNonZeroRecord(getParticipantPredictions(player));
-  });
 
   if (!participants.length) {
     elements.overviewContent.textContent = 'Noch keine Benutzer vorhanden.';
@@ -1236,6 +1252,111 @@ function renderPredictionsOverview() {
   }
 
   elements.overviewContent.textContent = 'Aktuelle Standings fehlen für den Scoreboard-Vergleich.';
+}
+
+function escapeCsvValue(value) {
+  if (value === null || value === undefined) return '';
+  const str = String(value);
+  return /[";\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+}
+
+function buildOverviewCsvRows(participants) {
+  const headers = [
+    'Conference',
+    'Division',
+    'Team',
+    'Aktueller Rang',
+    'Aktuelle Siege',
+    'Aktuelle Niederlagen',
+  ];
+
+  participants.forEach(player => {
+    const name = player.name || 'Unbekannt';
+    headers.push(`${name}: Rang`, `${name}: Siege`, `${name}: Niederlagen`, `${name}: Punkte`);
+  });
+
+  const rows = [headers];
+
+  CONFERENCE_ORDER.forEach(conf => {
+    STAT_DIVISION_ORDER.forEach(div => {
+      const divisionStandings = standingsSnapshot?.divisions?.[conf]?.[div] || [];
+      const divisionTeams = teams
+        .filter(team => team.conference === conf && team.division === div)
+        .sort((a, b) => {
+          const rankA = standingsSnapshot?.divisionRanks?.[a.name] ?? Number.POSITIVE_INFINITY;
+          const rankB = standingsSnapshot?.divisionRanks?.[b.name] ?? Number.POSITIVE_INFINITY;
+          if (rankA !== rankB) return rankA - rankB;
+          return a.name.localeCompare(b.name);
+        });
+
+      divisionTeams.forEach(team => {
+        const actualIndex = divisionStandings.findIndex(entry => entry.team.name === team.name);
+        const actualRank = actualIndex >= 0 ? actualIndex + 1 : '';
+        const actualStats = standingsSnapshot?.teamStats?.[team.name];
+
+        const baseRow = [
+          conf,
+          div,
+          team.name,
+          actualRank,
+          actualStats?.wins ?? '',
+          actualStats?.losses ?? '',
+        ];
+
+        participants.forEach(player => {
+          const predictions = getParticipantPredictions(player);
+          const normalized = normalizePrediction(predictions?.[team.name]);
+          const points = calculateTeamPoints(team.name, normalized);
+          baseRow.push(
+            normalized.divisionRank ?? '',
+            normalized.wins ?? '',
+            normalized.losses ?? '',
+            typeof points === 'number' ? points : ''
+          );
+        });
+
+        rows.push(baseRow);
+      });
+    });
+  });
+
+  return rows;
+}
+
+function handleOverviewExport() {
+  const locked = isLocked();
+  const participants = getOverviewParticipants();
+  updateOverviewExportButton(locked, participants);
+
+  if (!locked) {
+    elements.overviewStatus.textContent = 'Export steht erst nach dem Stichtag zur Verfügung.';
+    return;
+  }
+
+  if (!participants.length) {
+    elements.overviewStatus.textContent = 'Keine Tipps vorhanden, die exportiert werden können.';
+    return;
+  }
+
+  const rows = buildOverviewCsvRows(participants);
+  if (!rows.length) {
+    elements.overviewStatus.textContent = 'Keine Daten für den Export gefunden.';
+    return;
+  }
+
+  const csv = rows.map(row => row.map(escapeCsvValue).join(';')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `nfl-predictions-${predictionSeason}.csv`;
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+
+  elements.overviewStatus.textContent = 'CSV-Export erstellt.';
 }
 
 function buildOverviewScoreboard(participants) {
@@ -1463,6 +1584,7 @@ function setupEvents() {
   elements.refreshStats.addEventListener('click', loadStats);
   elements.seasonPicker?.addEventListener('change', handleSeasonChange);
   elements.importTableBtn?.addEventListener('click', handleTableImport);
+  elements.exportCsv?.addEventListener('click', handleOverviewExport);
 }
 
 function init() {

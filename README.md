@@ -155,8 +155,13 @@
 
         <section id="overviewTab" class="tab-pane">
           <div class="pane-header">
-            <h2>Vorhersagen aller Benutzer</h2>
-            <p id="overviewStatus" class="hint"></p>
+            <div>
+              <h2>Vorhersagen aller Benutzer</h2>
+              <p id="overviewStatus" class="hint"></p>
+            </div>
+            <div class="pane-actions">
+              <button id="exportCsv" class="secondary">CSV exportieren</button>
+            </div>
           </div>
           <div id="overviewContent" class="card"></div>
         </section>
