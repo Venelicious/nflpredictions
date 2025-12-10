@@ -1,29 +1,38 @@
-# Backend API
+# PHP Backend API
 
-Eine kleine Express-API mit MySQL-Anbindung für Registrierung, Login, Sessions und Tipps.
+Dieses Verzeichnis enthält eine schlanke PHP-API mit MySQL-Anbindung für Registrierung, Login, Sessions sowie das Verwalten von Tipps und Spielen. Node/Express wird nicht mehr verwendet.
 
-## Setup
+## Voraussetzungen
 
-1. Kopiere `.env.example` nach `.env` und trage deine Datenbank-Zugangsdaten ein.
-2. Führe die Migrationen aus:
+- PHP 8 mit PDO-MySQL Erweiterung
+- Ein laufender MySQL 8.x Server
+
+## Einrichtung
+
+1. Kopiere `.env.example` nach `.env` und passe die Datenbank- und Cookie-Einstellungen an.
+2. Erstelle die Datenbank und Tabellen mit dem vorhandenen SQL-Skript:
    ```bash
-   npm run migrate
+   mysql -u <user> -p < api/database-setup.sql
    ```
-3. Starte den Server:
+3. Starte die API z. B. über den eingebauten PHP-Server:
    ```bash
-   npm start
+   php -S 0.0.0.0:4000 -t api
    ```
 
-Standardmäßig lauscht der Server auf Port `4000` und erwartet einen MySQL-Server mit den in `.env` hinterlegten Zugangsdaten.
+Die API ist unter `http://localhost:4000/api` erreichbar. Für den lokalen Aufruf aus dem Frontend kann die Variable `CLIENT_ORIGIN` genutzt werden, damit Cookies korrekt gesetzt werden.
 
-Falls der Start mit `ECONNREFUSED ::1:3306` oder einer ähnlichen Meldung abbricht, läuft der MySQL-Dienst nicht oder ist unter Host/Port aus `.env` nicht erreichbar. Starte den MySQL-Server (z. B. `mysqld` oder `docker-compose up`) oder passe Host/Port/Passwort in `.env` an.
+## Verfügbare Endpunkte
 
-## Datenbank direkt in MySQL 8.0 anlegen
+- `GET /api/health` – einfacher Health-Check
+- `POST /api/auth/register` – Registrierung (JSON: `name`, `email`, `password`)
+- `POST /api/auth/login` – Anmeldung (JSON: `email`, `password`)
+- `POST /api/auth/logout` – Session löschen und Cookie entfernen
+- `GET /api/auth/me` – aktuellen Benutzer zurückgeben (erfordert Authentifizierung)
+- `PUT /api/auth/profile` – Profil aktualisieren (`name`, `favorite_team`)
+- `GET /api/session` – Session-Status inklusive Benutzer laden
+- `GET /api/games` – Spiele abrufen (erfordert Authentifizierung)
+- `GET /api/tips` – Eigene Tipps abrufen (erfordert Authentifizierung)
+- `POST /api/tips` – Tipp speichern oder aktualisieren (`season`, optional `gameId`, `predictedWinner`, `payload`)
+- `PUT /api/tips/:id` – Tipp anpassen
 
-Falls die Datenbank noch nicht existiert, kannst du sie mit dem SQL-Skript `api/database-setup.sql` vollständig einrichten (Datenbank, User und Tabellen).
-
-```bash
-mysql -u root -p < api/database-setup.sql
-```
-
-Passe bei Bedarf im Skript Host oder Passwort an. Anschließend kannst du wie gewohnt `npm run migrate` ausführen, um sicherzustellen, dass alle Tabellen auf dem aktuellen Stand sind.
+Alle Endpunkte liefern und erwarten JSON. Session-Tokens werden als HTTP-only Cookie `session_token` verwaltet.
