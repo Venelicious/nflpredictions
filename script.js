@@ -104,74 +104,168 @@ const teamNameLookup = teams.reduce((acc, team) => {
   return acc;
 }, {});
 
-const auth = {
-  storageKey: 'nflp_users',
-  currentKey: 'nflp_current',
-  get users() {
-    return JSON.parse(localStorage.getItem(this.storageKey) || '[]');
-  },
-  set users(list) {
-    localStorage.setItem(this.storageKey, JSON.stringify(list));
-  },
-  get currentUser() {
-    return localStorage.getItem(this.currentKey);
-  },
-  set currentUser(email) {
-    if (email) {
-      localStorage.setItem(this.currentKey, email);
-    } else {
-      localStorage.removeItem(this.currentKey);
+const API_BASE_URL = '/api';
+
+const apiClient = {
+  async request(path, options = {}) {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(options.headers || {}),
+      },
+      ...options,
+    });
+
+    let data = {};
+    try {
+      data = await response.json();
+    } catch (err) {
+      // ignore
     }
+
+    if (!response.ok) {
+      const error = new Error(data.error || 'Unbekannter Fehler.');
+      error.response = data;
+      throw error;
+    }
+    return data;
   },
-  register({ name, email, password }) {
-    const existing = this.users.find(u => u.email === email);
-    if (existing) throw new Error('E-Mail ist bereits registriert.');
-    const user = {
-      name,
-      email,
-      password: btoa(password),
-      favorite: '',
-      predictionsBySeason: { [predictionSeason]: defaultPredictions() },
-    };
-    this.users = [...this.users, user];
-    this.currentUser = email;
-    return user;
+  register(payload) {
+    return this.request('/auth/register', { method: 'POST', body: JSON.stringify(payload) });
   },
-  login(email, password) {
-    const user = this.users.find(u => u.email === email && u.password === btoa(password));
-    if (!user) throw new Error('Anmeldung fehlgeschlagen. Prüfe E-Mail oder Passwort.');
-    this.currentUser = email;
-    return user;
+  login(payload) {
+    return this.request('/auth/login', { method: 'POST', body: JSON.stringify(payload) });
   },
   logout() {
-    this.currentUser = '';
+    return this.request('/auth/logout', { method: 'POST' });
   },
-  updateProfile(email, payload) {
-    const updated = this.users.map(u => (u.email === email ? { ...u, ...payload } : u));
-    this.users = updated;
+  me() {
+    return this.request('/auth/me');
   },
-  updatePredictions(email, predictions, season = predictionSeason) {
-    const updated = this.users.map(u => (u.email === email ? { ...u, predictions } : u));
-    const cleaned = updated.map(u => {
-      if (u.email !== email) return u;
-      const predictionsBySeason = {
-        ...(u.predictionsBySeason || {}),
-        [season]: predictions,
-      };
-      const copy = { ...u, predictionsBySeason };
-      delete copy.predictions;
-      return copy;
+  updateProfile(payload) {
+    return this.request('/auth/profile', { method: 'PUT', body: JSON.stringify(payload) });
+  },
+  listTips() {
+    return this.request('/tips');
+  },
+  saveTip(payload) {
+    return this.request('/tips', { method: 'POST', body: JSON.stringify(payload) });
+  },
+};
+
+const auth = {
+  currentUserEmail: '',
+  profiles: {},
+  async init() {
+    try {
+      const { user } = await apiClient.me();
+      this.mergeUser(user);
+      await this.syncTips();
+    } catch (err) {
+      this.currentUserEmail = '';
+    }
+  },
+  mergeUser(user, tips = []) {
+    if (!user?.email) return;
+    const existing = this.profiles[user.email] || { predictionsBySeason: {} };
+    const predictionsBySeason = { ...(existing.predictionsBySeason || {}) };
+    tips.forEach(tip => {
+      if (tip.payload) {
+        predictionsBySeason[tip.season] = tip.payload;
+      }
     });
-    this.users = cleaned;
+
+    if (!predictionsBySeason[predictionSeason]) {
+      predictionsBySeason[predictionSeason] = defaultPredictions();
+    }
+
+    this.profiles[user.email] = {
+      ...existing,
+      ...user,
+      favorite: user.favorite_team || user.favorite || '',
+      predictionsBySeason,
+    };
+    this.currentUserEmail = user.email;
+  },
+  get users() {
+    return Object.values(this.profiles);
+  },
+  get currentUser() {
+    return this.currentUserEmail;
   },
   getUser(email) {
-    return this.users.find(u => u.email === email);
-  }
+    if (!this.profiles[email]) return null;
+    const profile = this.profiles[email];
+    return {
+      ...profile,
+      predictionsBySeason: profile.predictionsBySeason || { [predictionSeason]: defaultPredictions() },
+    };
+  },
+  async register({ name, email, password }) {
+    const { user } = await apiClient.register({ name, email, password });
+    this.mergeUser(user);
+    await this.syncTips();
+    return user;
+  },
+  async login(email, password) {
+    const { user } = await apiClient.login({ email, password });
+    this.mergeUser(user);
+    await this.syncTips();
+    return user;
+  },
+  async logout() {
+    await apiClient.logout().catch(() => {});
+    this.currentUserEmail = '';
+    this.profiles = {};
+  },
+  async updateProfile(email, payload) {
+    if (!this.profiles[email]) return;
+    const { user } = await apiClient.updateProfile(payload);
+    this.mergeUser(user);
+  },
+  async syncTips() {
+    if (!this.currentUserEmail) return;
+    try {
+      const { tips } = await apiClient.listTips();
+      const predictionsBySeason = tips.reduce((acc, tip) => {
+        if (tip.payload) {
+          acc[tip.season] = tip.payload;
+        }
+        return acc;
+      }, {});
+
+      const current = this.profiles[this.currentUserEmail] || { email: this.currentUserEmail };
+      this.profiles[this.currentUserEmail] = {
+        ...current,
+        predictionsBySeason: { ...(current.predictionsBySeason || {}), ...predictionsBySeason },
+      };
+
+      const merged = this.profiles[this.currentUserEmail].predictionsBySeason || {};
+      if (!merged[predictionSeason]) {
+        merged[predictionSeason] = defaultPredictions();
+        this.profiles[this.currentUserEmail].predictionsBySeason = merged;
+      }
+    } catch (err) {
+      console.warn('Tipps konnten nicht synchronisiert werden.', err);
+    }
+  },
+  async updatePredictions(email, predictions, season = predictionSeason) {
+    const user = this.profiles[email];
+    if (!user) return;
+    this.profiles[email] = {
+      ...user,
+      predictionsBySeason: { ...(user.predictionsBySeason || {}), [season]: predictions },
+    };
+    await apiClient.saveTip({ season, payload: predictions });
+  },
 };
 
 const elements = {
   loginForm: document.getElementById('loginForm'),
   registerForm: document.getElementById('registerForm'),
+  loginStatus: document.getElementById('loginStatus'),
+  registerStatus: document.getElementById('registerStatus'),
   showRegister: document.getElementById('showRegister'),
   showLogin: document.getElementById('showLogin'),
   welcomeArea: document.getElementById('welcomeArea'),
@@ -550,9 +644,17 @@ function showAuth(mode) {
   elements.registerForm.classList.toggle('hidden', mode !== 'register');
 }
 
+function setStatus(element, message, type = '') {
+  if (!element) return;
+  element.textContent = message || '';
+  element.className = `status ${type}`.trim();
+}
+
 function updateAuthUI() {
   const current = auth.currentUser;
   const loggedIn = Boolean(current);
+  setStatus(elements.loginStatus, '');
+  setStatus(elements.registerStatus, '');
   elements.authArea?.classList.toggle('auth-area--logged-in', loggedIn);
   elements.welcomeArea.classList.toggle('hidden', !loggedIn);
   elements.tabs.classList.toggle('hidden', !loggedIn);
@@ -981,7 +1083,7 @@ function isLocked() {
   return new Date() > lockDate;
 }
 
-function savePredictions() {
+async function savePredictions() {
   const owner = getActivePredictionOwner();
   if (!owner) return;
   const predictions = {};
@@ -1027,61 +1129,75 @@ function savePredictions() {
     return;
   }
 
-  if (owner.type === 'co') {
-    const updated = readCoPlayers().map(player => {
-      if (player.id !== owner.identifier) return player;
-      const predictionsBySeason = { ...(player.predictionsBySeason || {}), [predictionSeason]: predictions };
-      return { ...player, predictionsBySeason };
-    });
-    saveCoPlayers(updated);
-    elements.predictionStatus.textContent = 'Tipps des Mitspielers gespeichert!';
-  } else {
-    auth.updatePredictions(owner.identifier, predictions, predictionSeason);
-    elements.predictionStatus.textContent = 'Tipps gespeichert!';
+  try {
+    if (owner.type === 'co') {
+      const updated = readCoPlayers().map(player => {
+        if (player.id !== owner.identifier) return player;
+        const predictionsBySeason = { ...(player.predictionsBySeason || {}), [predictionSeason]: predictions };
+        return { ...player, predictionsBySeason };
+      });
+      saveCoPlayers(updated);
+      elements.predictionStatus.textContent = 'Tipps des Mitspielers gespeichert!';
+    } else {
+      await auth.updatePredictions(owner.identifier, predictions, predictionSeason);
+      elements.predictionStatus.textContent = 'Tipps gespeichert!';
+    }
+    elements.predictionStatus.className = 'status success';
+  } catch (err) {
+    elements.predictionStatus.textContent = err.message || 'Speichern nicht möglich.';
+    elements.predictionStatus.className = 'status error';
   }
-  elements.predictionStatus.className = 'status success';
 }
 
-function handleProfileSubmit(event) {
+async function handleProfileSubmit(event) {
   event.preventDefault();
   const current = auth.getUser(auth.currentUser);
   if (!current) return;
   const payload = {
     name: elements.profileName.value.trim(),
-    favorite: elements.profileFavorite.value,
+    favorite_team: elements.profileFavorite.value,
   };
-  auth.updateProfile(current.email, payload);
-  elements.welcomeName.textContent = payload.name;
-  elements.profileStatus.textContent = 'Profil gespeichert';
-  elements.profileStatus.className = 'status success';
+  try {
+    await auth.updateProfile(current.email, payload);
+    elements.welcomeName.textContent = payload.name || current.name;
+    elements.profileStatus.textContent = 'Profil gespeichert';
+    elements.profileStatus.className = 'status success';
+  } catch (err) {
+    elements.profileStatus.textContent = err.message || 'Profil konnte nicht aktualisiert werden.';
+    elements.profileStatus.className = 'status error';
+  }
 }
 
-function handleRegister(event) {
+async function handleRegister(event) {
   event.preventDefault();
+  setStatus(elements.registerStatus, 'Registrierung läuft…', '');
   try {
-    auth.register({
+    await auth.register({
       name: document.getElementById('registerName').value.trim(),
       email: document.getElementById('registerEmail').value.trim().toLowerCase(),
       password: document.getElementById('registerPassword').value,
     });
     showAuth('');
+    setStatus(elements.registerStatus, 'Registrierung erfolgreich!', 'success');
     updateAuthUI();
   } catch (err) {
-    alert(err.message);
+    setStatus(elements.registerStatus, err.message || 'Registrierung fehlgeschlagen.', 'error');
   }
 }
 
-function handleLogin(event) {
+async function handleLogin(event) {
   event.preventDefault();
+  setStatus(elements.loginStatus, 'Anmeldung läuft…', '');
   try {
-    auth.login(
+    await auth.login(
       document.getElementById('loginEmail').value.trim().toLowerCase(),
       document.getElementById('loginPassword').value
     );
     showAuth('');
+    setStatus(elements.loginStatus, 'Erfolgreich angemeldet!', 'success');
     updateAuthUI();
   } catch (err) {
-    alert(err.message);
+    setStatus(elements.loginStatus, err.message || 'Anmeldung fehlgeschlagen.', 'error');
   }
 }
 
@@ -1738,8 +1854,8 @@ function setupEvents() {
   elements.startNow.addEventListener('click', () => showAuth('register'));
   elements.registerForm.addEventListener('submit', handleRegister);
   elements.loginForm.addEventListener('submit', handleLogin);
-  elements.logoutBtn.addEventListener('click', () => {
-    auth.logout();
+  elements.logoutBtn.addEventListener('click', async () => {
+    await auth.logout();
     setActivePredictor({ type: 'user', id: '' });
     updateAuthUI();
     showAuth('login');
@@ -1765,12 +1881,13 @@ function setupEvents() {
   elements.exportPdf?.addEventListener('click', handleOverviewPdfExport);
 }
 
-function init() {
+async function init() {
   populateTeamSelect();
   populateSeasonPicker();
   populateLockSeasonSelect();
   showAuth('login');
   setupEvents();
+  await auth.init();
   if (auth.currentUser) {
     updateAuthUI();
   }
@@ -1778,4 +1895,6 @@ function init() {
   loadStats();
 }
 
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener('DOMContentLoaded', () => {
+  init();
+});
