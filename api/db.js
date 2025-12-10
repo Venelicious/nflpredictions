@@ -15,6 +15,7 @@ function getPool() {
       database: process.env.DB_NAME,
       waitForConnections: true,
       connectionLimit: 10,
+      multipleStatements: true,
       timezone: 'Z',
     });
   }
