@@ -554,10 +554,12 @@ function showAuth(mode) {
 function updateAuthUI() {
   const current = auth.currentUser;
   const loggedIn = Boolean(current);
+  elements.authArea?.classList.toggle('auth-area--logged-in', loggedIn);
   elements.welcomeArea.classList.toggle('hidden', !loggedIn);
   elements.tabs.classList.toggle('hidden', !loggedIn);
   elements.welcomeHero.classList.toggle('hidden', loggedIn);
   if (loggedIn) {
+    showAuth('');
     const user = auth.getUser(current);
     elements.welcomeName.textContent = user?.name || '';
     elements.welcomeEmail.textContent = user?.email || '';
@@ -575,6 +577,7 @@ function updateAuthUI() {
     refreshCoPlayerSelect();
     loadPredictionsForActive();
   } else {
+    showAuth('login');
     refreshCoPlayerSelect();
     updateOverviewAccess();
   }

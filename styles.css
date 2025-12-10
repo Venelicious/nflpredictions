@@ -77,6 +77,14 @@ main { padding: 24px; }
   gap: 16px;
 }
 
+.auth-area--logged-in {
+  justify-content: flex-end;
+}
+
+.auth-area--logged-in .auth-form {
+  display: none;
+}
+
 .auth-form {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
