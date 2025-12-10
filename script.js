@@ -1508,47 +1508,6 @@ function buildOverviewPdfRows(participants) {
   return rows;
 }
 
-function buildScoreboardPrintSheets(participantGroups) {
-  const container = document.createElement('div');
-  container.style.position = 'fixed';
-  container.style.inset = '0';
-  container.style.zIndex = '-1';
-  container.style.opacity = '0';
-  container.style.pointerEvents = 'none';
-
-  participantGroups.forEach(group => {
-    const sheet = document.createElement('div');
-    sheet.className = 'print-sheet';
-
-    const header = document.createElement('div');
-    header.className = 'print-sheet__header';
-    header.innerHTML = `
-      <div>
-        <h2 class="print-sheet__title">NFL Predictions – Scoreboard</h2>
-        <p class="print-sheet__meta">Saison ${predictionSeason}</p>
-        <p class="print-sheet__players">Spieler: ${group.map(p => p.name).join(', ')}</p>
-      </div>
-      <div class="hint">Perfektes Ranking: +1 Punkt pro Division</div>
-    `;
-
-    sheet.appendChild(header);
-
-    const scoreboard = buildOverviewScoreboard(group, {
-      title: 'Live-Standings vs. Tipps',
-      subtitle: `Saison ${predictionSeason}`,
-      hint: 'Bonus-Punkte für perfekte Division-Tipps',
-    });
-
-    if (scoreboard) {
-      sheet.appendChild(scoreboard);
-    }
-
-    container.appendChild(sheet);
-  });
-
-  return container;
-}
-
 function handleOverviewPdfExport() {
   const locked = isLocked();
   const participants = getOverviewParticipants();
@@ -1570,67 +1529,58 @@ function handleOverviewPdfExport() {
   }
 
   const pdfLib = window.jspdf;
-  const html2canvas = window.html2canvas;
   if (!pdfLib || !pdfLib.jsPDF) {
     elements.overviewStatus.textContent = 'jsPDF konnte nicht geladen werden.';
     return;
   }
 
-  if (!html2canvas) {
-    elements.overviewStatus.textContent = 'html2canvas konnte nicht geladen werden.';
+  if (typeof pdfLib.jsPDF.API?.autoTable !== 'function') {
+    elements.overviewStatus.textContent = 'jsPDF-AutoTable steht nicht zur Verfügung.';
     return;
   }
 
   const { jsPDF } = pdfLib;
-  const participantGroups = chunkParticipants(participants, 4);
-  const printContainer = buildScoreboardPrintSheets(participantGroups);
-  document.body.appendChild(printContainer);
-
   const doc = new jsPDF({ orientation: 'landscape', unit: 'pt' });
-  const sheets = Array.from(printContainer.querySelectorAll('.print-sheet'));
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 24;
+  const participantGroups = chunkParticipants(participants, 5);
 
-  const addSheetToPdf = async (sheet, isFirstPage) => {
-    if (!isFirstPage) doc.addPage();
-    const canvas = await html2canvas(sheet, {
-      scale: 2,
-      backgroundColor: '#ffffff',
-      useCORS: true,
+  elements.overviewStatus.textContent = 'PDF-Export wird vorbereitet…';
+
+  try {
+    participantGroups.forEach((group, idx) => {
+      if (idx > 0) {
+        doc.addPage('landscape');
+      }
+
+      doc.setFontSize(16);
+      doc.text('NFL Predictions – Scoreboard', margin, margin);
+      doc.setFontSize(11);
+      doc.text(`Saison ${predictionSeason} • Spieler: ${group.map(p => p.name).join(', ')}`, margin, margin + 16);
+
+      const head = [['Division', 'Team (Standings)', ...group.map(p => p.name || 'Unbekannt')]];
+      const body = buildOverviewPdfRows(group);
+
+      doc.autoTable({
+        head,
+        body,
+        startY: margin + 28,
+        theme: 'grid',
+        styles: { fontSize: 8, cellPadding: 4, overflow: 'linebreak' },
+        headStyles: { fillColor: [24, 69, 158], textColor: 255, fontStyle: 'bold' },
+        columnStyles: {
+          0: { cellWidth: 80 },
+          1: { cellWidth: 170 },
+        },
+        margin: { left: margin, right: margin, bottom: margin },
+      });
     });
 
-    const imgData = canvas.toDataURL('image/png');
-    const ratio = Math.min(
-      (pageWidth - margin * 2) / canvas.width,
-      (pageHeight - margin * 2) / canvas.height
-    );
-    const imgWidth = canvas.width * ratio;
-    const imgHeight = canvas.height * ratio;
-    const offsetX = (pageWidth - imgWidth) / 2;
-    const offsetY = (pageHeight - imgHeight) / 2;
-
-    doc.addImage(imgData, 'PNG', offsetX, offsetY, imgWidth, imgHeight);
-  };
-
-  const renderAll = async () => {
-    for (let i = 0; i < sheets.length; i++) {
-      // eslint-disable-next-line no-await-in-loop
-      await addSheetToPdf(sheets[i], i === 0);
-    }
-  };
-
-  renderAll()
-    .then(() => {
-      doc.save(`nfl-predictions-scoreboard-${predictionSeason}.pdf`);
-      elements.overviewStatus.textContent = 'PDF-Export im Scoreboard-Design erstellt.';
-    })
-    .catch(() => {
-      elements.overviewStatus.textContent = 'PDF-Export fehlgeschlagen.';
-    })
-    .finally(() => {
-      document.body.removeChild(printContainer);
-    });
+    doc.save(`nfl-predictions-scoreboard-${predictionSeason}.pdf`);
+    elements.overviewStatus.textContent = 'PDF-Export im Tabellenformat erstellt.';
+  } catch (err) {
+    console.error(err);
+    elements.overviewStatus.textContent = 'PDF-Export fehlgeschlagen.';
+  }
 }
 
 function buildOverviewScoreboard(participants, options = {}) {
