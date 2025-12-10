@@ -104,10 +104,22 @@ const teamNameLookup = teams.reduce((acc, team) => {
   return acc;
 }, {});
 
-const API_BASE_URL = '/api';
+const API_BASE_URL =
+  window.API_BASE_URL ?? (['localhost', '127.0.0.1'].includes(window.location.hostname) ? '/api' : '');
+const API_ENABLED = Boolean(API_BASE_URL);
+
+function ensureApiAvailable() {
+  if (API_ENABLED) return true;
+  const error = new Error(
+    'Die Backend-API ist in dieser Umgebung nicht erreichbar. Registrierung und Login sind deaktiviert.'
+  );
+  error.offline = true;
+  throw error;
+}
 
 const apiClient = {
   async request(path, options = {}) {
+	ensureApiAvailable();
     const response = await fetch(`${API_BASE_URL}${path}`, {
       credentials: 'include',
       headers: {
@@ -158,7 +170,8 @@ const auth = {
   currentUserEmail: '',
   profiles: {},
   async init() {
-    try {
+    if (!API_ENABLED) return;
+	try {
       const { user } = await apiClient.me();
       this.mergeUser(user);
       await this.syncTips();
@@ -203,29 +216,34 @@ const auth = {
     };
   },
   async register({ name, email, password }) {
-    const { user } = await apiClient.register({ name, email, password });
+    ensureApiAvailable();
+	const { user } = await apiClient.register({ name, email, password });
     this.mergeUser(user);
     await this.syncTips();
     return user;
   },
   async login(email, password) {
-    const { user } = await apiClient.login({ email, password });
+    ensureApiAvailable();
+	const { user } = await apiClient.login({ email, password });
     this.mergeUser(user);
     await this.syncTips();
     return user;
   },
   async logout() {
-    await apiClient.logout().catch(() => {});
+    if (!API_ENABLED) return;
+	await apiClient.logout().catch(() => {});
     this.currentUserEmail = '';
     this.profiles = {};
   },
   async updateProfile(email, payload) {
     if (!this.profiles[email]) return;
-    const { user } = await apiClient.updateProfile(payload);
+    ensureApiAvailable();
+	const { user } = await apiClient.updateProfile(payload);
     this.mergeUser(user);
   },
   async syncTips() {
-    if (!this.currentUserEmail) return;
+    if (!API_ENABLED) return;
+	if (!this.currentUserEmail) return;
     try {
       const { tips } = await apiClient.listTips();
       const predictionsBySeason = tips.reduce((acc, tip) => {
@@ -257,7 +275,8 @@ const auth = {
       ...user,
       predictionsBySeason: { ...(user.predictionsBySeason || {}), [season]: predictions },
     };
-    await apiClient.saveTip({ season, payload: predictions });
+    ensureApiAvailable();
+	await apiClient.saveTip({ season, payload: predictions });
   },
 };
 
@@ -653,8 +672,14 @@ function setStatus(element, message, type = '') {
 function updateAuthUI() {
   const current = auth.currentUser;
   const loggedIn = Boolean(current);
-  setStatus(elements.loginStatus, '');
-  setStatus(elements.registerStatus, '');
+  const disabledMessage =
+    'Registrierung und Login sind im Demo-Modus deaktiviert. Bitte lokal mit laufender API testen.';
+  const authDisabled = !API_ENABLED;
+
+  setStatus(elements.loginStatus, authDisabled ? disabledMessage : '');
+  setStatus(elements.registerStatus, authDisabled ? disabledMessage : '');
+  elements.loginForm?.querySelectorAll('input, button').forEach(el => (el.disabled = authDisabled));
+  elements.registerForm?.querySelectorAll('input, button').forEach(el => (el.disabled = authDisabled));
   elements.authArea?.classList.toggle('auth-area--logged-in', loggedIn);
   elements.welcomeArea.classList.toggle('hidden', !loggedIn);
   elements.tabs.classList.toggle('hidden', !loggedIn);
