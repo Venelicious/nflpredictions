@@ -14,8 +14,6 @@ const LOCK_DATE_STORAGE_KEY = 'nflp_lock_dates';
 const CO_PLAYER_STORAGE_KEY = 'nflp_co_players';
 const ACTIVE_PREDICTOR_KEY = 'nflp_active_predictor';
 let predictionSeason = localStorage.getItem(PREDICTION_SEASON_KEY) || AVAILABLE_SEASONS[0].value;
-const logoDataCache = new Map();
-
 const teamLogos = {
   'Buffalo Bills': 'https://a.espncdn.com/i/teamlogos/nfl/500/buf.png',
   'Miami Dolphins': 'https://a.espncdn.com/i/teamlogos/nfl/500/mia.png',
@@ -451,51 +449,6 @@ function sortTeams() {
 
 function getTeamLogo(teamName) {
   return teamLogos[teamName] || '';
-}
-
-function findStandingsLogo(teamName) {
-  return standingsSnapshot?.teamStats?.[teamName]?.logo || '';
-}
-
-async function fetchImageAsDataUrl(url) {
-  const response = await fetch(url);
-  const blob = await response.blob();
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-}
-
-async function getTeamLogoDataUrl(teamName) {
-  if (logoDataCache.has(teamName)) return logoDataCache.get(teamName);
-
-  const logoUrl = findStandingsLogo(teamName) || getTeamLogo(teamName);
-  if (!logoUrl) {
-    logoDataCache.set(teamName, null);
-    return null;
-  }
-
-  try {
-    const dataUrl = await fetchImageAsDataUrl(logoUrl);
-    logoDataCache.set(teamName, dataUrl);
-    return dataUrl;
-  } catch (err) {
-    console.error('Logo konnte nicht geladen werden:', teamName, err);
-    logoDataCache.set(teamName, null);
-    return null;
-  }
-}
-
-async function preloadTeamLogosForPdf() {
-  const names = teams.map(team => team.name);
-  const payloads = await Promise.all(names.map(name => getTeamLogoDataUrl(name)));
-
-  return names.reduce((acc, name, idx) => {
-    if (payloads[idx]) acc[name] = payloads[idx];
-    return acc;
-  }, {});
 }
 
 function renderTeamLabel(name) {
@@ -1501,69 +1454,6 @@ function handleOverviewExport() {
   elements.overviewStatus.textContent = 'CSV-Export erstellt.';
 }
 
-function chunkParticipants(participants, chunkSize = 6) {
-  const chunks = [];
-  for (let i = 0; i < participants.length; i += chunkSize) {
-    chunks.push(participants.slice(i, i + chunkSize));
-  }
-  return chunks;
-}
-
-function formatPredictionForExport(rawPrediction, teamName, rowRank = '', logoData, withPoints = false) {
-  const prediction = normalizePrediction(rawPrediction || {});
-  const rank = Number.isFinite(prediction.divisionRank) ? prediction.divisionRank : '–';
-  const wins = Number.isFinite(prediction.wins) ? prediction.wins : '–';
-  const losses = Number.isFinite(prediction.losses) ? prediction.losses : '–';
-  const teamPoints = withPoints ? calculateTeamPoints(teamName, prediction) : null;
-  const pointsLabel = typeof teamPoints === 'number' ? `${teamPoints} Punkte` : '–';
-  const rankPrefix = rowRank ? `${rowRank}. ` : '';
-
-  return {
-    content: `${rankPrefix}${teamName}\nTipp: ${wins}-${losses} | ${pointsLabel}`,
-    raw: { teamName, logo: logoData?.[teamName] },
-  };
-}
-
-function buildOverviewPdfRows(participants, logoData) {
-  const rows = [];
-
-  CONFERENCE_ORDER.forEach(conf => {
-    STAT_DIVISION_ORDER.forEach(div => {
-      const divisionStandings = standingsSnapshot?.divisions?.[conf]?.[div] || [];
-      const divisionTeams = divisionStandings.length
-        ? divisionStandings.map(entry => entry.team.name)
-        : teams.filter(team => team.conference === conf && team.division === div).map(team => team.name);
-
-      let isFirstRow = true;
-
-      divisionTeams.forEach((teamName, idx) => {
-        const standingsEntry = divisionStandings[idx];
-        const recordLabel = standingsEntry
-          ? `${standingsEntry.stats.wins}-${standingsEntry.stats.losses}`
-          : '';
-        const actualLabel = `${idx + 1}. ${teamName}${recordLabel ? `\nRecord: ${recordLabel}` : ''}`;
-
-        const row = [
-          isFirstRow ? `${conf} ${div}` : '',
-          { content: actualLabel || '', raw: { teamName, logo: logoData?.[teamName] } },
-        ];
-
-        participants.forEach(player => {
-          const predictions = getParticipantPredictions(player);
-          row.push(formatPredictionForExport(predictions?.[teamName], teamName, idx + 1, logoData, true));
-        });
-
-        rows.push(row);
-        isFirstRow = false;
-      });
-
-      if (divisionTeams.length) rows.push(Array(participants.length + 2).fill(''));
-    });
-  });
-
-  return rows;
-}
-
 async function handleOverviewPdfExport() {
   const locked = isLocked();
   const participants = getOverviewParticipants();
@@ -1579,83 +1469,58 @@ async function handleOverviewPdfExport() {
     return;
   }
 
-  if (!standingsSnapshot) {
-    elements.overviewStatus.textContent = 'Aktuelle Standings fehlen für den Scoreboard-Export.';
+  const scoreboard = elements.overviewContent.querySelector('.overview-scoreboard');
+  if (!scoreboard) {
+    elements.overviewStatus.textContent = 'Scoreboard fehlt für den Export.';
     return;
   }
 
-  const pdfLib = window.jspdf;
-  if (!pdfLib || !pdfLib.jsPDF) {
-    elements.overviewStatus.textContent = 'jsPDF konnte nicht geladen werden.';
-    return;
-  }
-
-  if (typeof pdfLib.jsPDF.API?.autoTable !== 'function') {
-    elements.overviewStatus.textContent = 'jsPDF-AutoTable steht nicht zur Verfügung.';
-    return;
-  }
-
-  elements.overviewStatus.textContent = 'PDF-Export wird vorbereitet…';
-  const logoData = await preloadTeamLogosForPdf();
-
-  const { jsPDF } = pdfLib;
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'pt' });
-  const margin = 16;
-  const participantGroups = participants.length ? [participants] : [];
-  const headerPoints = participant => {
-    const total = calculateUserTotalPoints(getParticipantPredictions(participant));
-    if (typeof total === 'number') return `${participant.name} (${total} Punkte)`;
-    return participant.name || 'Unbekannt';
-  };
+  elements.overviewStatus.textContent = 'Druckbare Scoreboard-Ansicht wird vorbereitet…';
 
   try {
-    participantGroups.forEach((group, idx) => {
-      if (idx > 0) {
-        doc.addPage('landscape');
-      }
-
-      doc.setFontSize(16);
-      doc.text('NFL Predictions – Scoreboard', margin, margin);
-      doc.setFontSize(11);
-      doc.text(`Saison ${predictionSeason} • Spieler: ${group.map(p => p.name).join(', ')}`, margin, margin + 16);
-
-      const head = [['Division', 'Team (Record)', ...group.map(headerPoints)]];
-      const body = buildOverviewPdfRows(group, logoData);
-
-      doc.autoTable({
-        head,
-        body,
-        startY: margin + 28,
-        theme: 'grid',
-        styles: { fontSize: 7, cellPadding: { top: 4, right: 4, bottom: 4, left: 28 }, overflow: 'linebreak' },
-        headStyles: { fillColor: [24, 69, 158], textColor: 255, fontStyle: 'bold' },
-        columnStyles: {
-          0: { cellWidth: 70 },
-          1: { cellWidth: 80, minCellHeight: 26 },
-        },
-        margin: { left: margin, right: margin, bottom: margin },
-        tableWidth: 'auto',
-        rowPageBreak: 'avoid',
-        didDrawCell(data) {
-          if (data.section !== 'body') return;
-          const logo = data.cell.raw?.logo;
-          if (!logo) return;
-
-          const size = 22;
-          const x = data.cell.x + 4;
-          const y = data.cell.y + (data.cell.height - size) / 2;
-
-          try {
-            doc.addImage(logo, 'PNG', x, y, size, size);
-          } catch (err) {
-            console.error('Logo konnte nicht in die PDF eingefügt werden:', data.cell.raw?.teamName, err);
-          }
-        },
-      });
+    const canvas = await html2canvas(scoreboard, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#f7f9fc',
+      windowWidth: scoreboard.scrollWidth,
+      windowHeight: scoreboard.scrollHeight,
     });
 
-    doc.save(`nfl-predictions-scoreboard-${predictionSeason}.pdf`);
-    elements.overviewStatus.textContent = 'PDF-Export im Tabellenformat erstellt.';
+    const imageData = canvas.toDataURL('image/png');
+    const exportWindow = window.open('', '_blank');
+
+    if (!exportWindow) {
+      elements.overviewStatus.textContent = 'Popup blockiert. Erlaube Popups für den PDF-Export.';
+      return;
+    }
+
+    exportWindow.document.write(`
+      <html>
+        <head>
+          <title>NFL Predictions – Scoreboard Export</title>
+          <style>
+            body { margin: 0; padding: 16px; background: #f7f9fc; display: flex; justify-content: center; }
+            img { max-width: 100%; height: auto; box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
+          </style>
+        </head>
+        <body>
+          <img src="${imageData}" alt="NFL Predictions Scoreboard" />
+        </body>
+      </html>
+    `);
+    exportWindow.document.close();
+    exportWindow.focus();
+
+    const triggerPrint = () => {
+      exportWindow.print();
+      elements.overviewStatus.textContent = 'Druckbare Ansicht geöffnet. "Als PDF speichern" im Druckdialog wählen.';
+    };
+
+    if (exportWindow.document.readyState === 'complete') {
+      triggerPrint();
+    } else {
+      exportWindow.onload = triggerPrint;
+    }
   } catch (err) {
     console.error(err);
     elements.overviewStatus.textContent = 'PDF-Export fehlgeschlagen.';
