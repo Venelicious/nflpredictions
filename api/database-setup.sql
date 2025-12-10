@@ -1,0 +1,59 @@
+-- MySQL 8.0 Setup Script for NFL Predictions
+-- Creates database, application user, and required tables.
+
+-- Create database and user (adjust host or password if needed)
+CREATE DATABASE IF NOT EXISTS dbs15059918
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_0900_ai_ci;
+
+CREATE USER IF NOT EXISTS 'dbu5771551'@'%'
+  IDENTIFIED BY 'Wosini16.10.10!';
+GRANT ALL PRIVILEGES ON dbs15059918.* TO 'dbu5771551'@'%';
+FLUSH PRIVILEGES;
+
+USE dbs15059918;
+
+-- Tables
+CREATE TABLE IF NOT EXISTS users (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  email VARCHAR(255) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+  favorite_team VARCHAR(255) DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS games (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  home_team VARCHAR(255) NOT NULL,
+  away_team VARCHAR(255) NOT NULL,
+  game_time DATETIME NULL,
+  season VARCHAR(10) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS tips (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  season VARCHAR(10) NOT NULL,
+  game_id INT NULL,
+  predicted_winner VARCHAR(255) NULL,
+  payload JSON NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_tips_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_tips_game FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE SET NULL,
+  UNIQUE KEY uniq_user_season_game (user_id, season, game_id)
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  token_hash CHAR(64) NOT NULL,
+  expires_at DATETIME NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE KEY uniq_token (token_hash)
+);
