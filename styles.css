@@ -608,6 +608,10 @@ button { font-family: inherit; }
   overflow-x: auto;
 }
 
+.overview-scoreboard--export {
+  overflow: visible;
+}
+
 .overview-scoreboard__header {
   display: flex;
   align-items: center;
