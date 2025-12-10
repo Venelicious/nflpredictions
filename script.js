@@ -1509,15 +1509,19 @@ function chunkParticipants(participants, chunkSize = 6) {
   return chunks;
 }
 
-function formatPredictionForExport(rawPrediction, teamName, withPoints = false) {
-  if (!rawPrediction) return '–';
-  const prediction = normalizePrediction(rawPrediction);
+function formatPredictionForExport(rawPrediction, teamName, rowRank = '', logoData, withPoints = false) {
+  const prediction = normalizePrediction(rawPrediction || {});
   const rank = Number.isFinite(prediction.divisionRank) ? prediction.divisionRank : '–';
   const wins = Number.isFinite(prediction.wins) ? prediction.wins : '–';
   const losses = Number.isFinite(prediction.losses) ? prediction.losses : '–';
   const teamPoints = withPoints ? calculateTeamPoints(teamName, prediction) : null;
-  const pointLabel = typeof teamPoints === 'number' ? ` • ${teamPoints} Pkt` : '';
-  return `${rank} (${wins}-${losses})${pointLabel}`;
+  const pointsLabel = typeof teamPoints === 'number' ? `${teamPoints} Punkte` : '–';
+  const rankPrefix = rowRank ? `${rowRank}. ` : '';
+
+  return {
+    content: `${rankPrefix}${teamName}\nTipp: ${wins}-${losses} | ${pointsLabel}`,
+    raw: { teamName, logo: logoData?.[teamName] },
+  };
 }
 
 function buildOverviewPdfRows(participants, logoData) {
@@ -1537,15 +1541,16 @@ function buildOverviewPdfRows(participants, logoData) {
         const recordLabel = standingsEntry
           ? `${standingsEntry.stats.wins}-${standingsEntry.stats.losses}`
           : '';
+        const actualLabel = `${idx + 1}. ${teamName}${recordLabel ? `\nRecord: ${recordLabel}` : ''}`;
 
         const row = [
           isFirstRow ? `${conf} ${div}` : '',
-          { content: recordLabel || '', raw: { teamName, logo: logoData?.[teamName] } },
+          { content: actualLabel || '', raw: { teamName, logo: logoData?.[teamName] } },
         ];
 
         participants.forEach(player => {
           const predictions = getParticipantPredictions(player);
-          row.push(formatPredictionForExport(predictions?.[teamName], teamName, true));
+          row.push(formatPredictionForExport(predictions?.[teamName], teamName, idx + 1, logoData, true));
         });
 
         rows.push(row);
@@ -1599,7 +1604,7 @@ async function handleOverviewPdfExport() {
   const participantGroups = participants.length ? [participants] : [];
   const headerPoints = participant => {
     const total = calculateUserTotalPoints(getParticipantPredictions(participant));
-    if (typeof total === 'number') return `${participant.name} (${total} Pkt)`;
+    if (typeof total === 'number') return `${participant.name} (${total} Punkte)`;
     return participant.name || 'Unbekannt';
   };
 
@@ -1622,7 +1627,7 @@ async function handleOverviewPdfExport() {
         body,
         startY: margin + 28,
         theme: 'grid',
-        styles: { fontSize: 7, cellPadding: 2, overflow: 'linebreak' },
+        styles: { fontSize: 7, cellPadding: { top: 4, right: 4, bottom: 4, left: 28 }, overflow: 'linebreak' },
         headStyles: { fillColor: [24, 69, 158], textColor: 255, fontStyle: 'bold' },
         columnStyles: {
           0: { cellWidth: 70 },
@@ -1632,7 +1637,7 @@ async function handleOverviewPdfExport() {
         tableWidth: 'auto',
         rowPageBreak: 'avoid',
         didDrawCell(data) {
-          if (data.section !== 'body' || data.column.index !== 1) return;
+          if (data.section !== 'body') return;
           const logo = data.cell.raw?.logo;
           if (!logo) return;
 
