@@ -1477,6 +1477,10 @@ async function handleOverviewPdfExport() {
 
   elements.overviewStatus.textContent = 'Druckbare Scoreboard-Ansicht wird vorbereitet…';
 
+  const originalWidth = scoreboard.style.width;
+  scoreboard.classList.add('overview-scoreboard--export');
+  scoreboard.style.width = `${scoreboard.scrollWidth}px`;
+
   try {
     const canvas = await html2canvas(scoreboard, {
       scale: 2,
@@ -1524,6 +1528,9 @@ async function handleOverviewPdfExport() {
   } catch (err) {
     console.error(err);
     elements.overviewStatus.textContent = 'PDF-Export fehlgeschlagen.';
+  } finally {
+    scoreboard.style.width = originalWidth;
+    scoreboard.classList.remove('overview-scoreboard--export');
   }
 }
 
