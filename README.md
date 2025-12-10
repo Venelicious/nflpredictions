@@ -14,6 +14,7 @@
         <input type="email" id="loginEmail" placeholder="E-Mail" required>
         <input type="password" id="loginPassword" placeholder="Passwort" required>
         <button type="submit">Anmelden</button>
+        <p class="status" id="loginStatus"></p>
         <p class="helper">Noch kein Account? <button type="button" class="linkish" id="showRegister">Registrieren</button></p>
       </form>
       <form id="registerForm" class="auth-form hidden">
@@ -21,6 +22,7 @@
         <input type="email" id="registerEmail" placeholder="E-Mail" required>
         <input type="password" id="registerPassword" placeholder="Passwort" required>
         <button type="submit">Registrieren</button>
+        <p class="status" id="registerStatus"></p>
         <p class="helper">Bereits registriert? <button type="button" class="linkish" id="showLogin">Anmelden</button></p>
       </form>
       <div id="welcomeArea" class="welcome hidden">
