@@ -14,6 +14,7 @@ const LOCK_DATE_STORAGE_KEY = 'nflp_lock_dates';
 const CO_PLAYER_STORAGE_KEY = 'nflp_co_players';
 const ACTIVE_PREDICTOR_KEY = 'nflp_active_predictor';
 let predictionSeason = localStorage.getItem(PREDICTION_SEASON_KEY) || AVAILABLE_SEASONS[0].value;
+const logoDataCache = new Map();
 
 const teamLogos = {
   'Buffalo Bills': 'https://a.espncdn.com/i/teamlogos/nfl/500/buf.png',
@@ -450,6 +451,51 @@ function sortTeams() {
 
 function getTeamLogo(teamName) {
   return teamLogos[teamName] || '';
+}
+
+function findStandingsLogo(teamName) {
+  return standingsSnapshot?.teamStats?.[teamName]?.logo || '';
+}
+
+async function fetchImageAsDataUrl(url) {
+  const response = await fetch(url);
+  const blob = await response.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function getTeamLogoDataUrl(teamName) {
+  if (logoDataCache.has(teamName)) return logoDataCache.get(teamName);
+
+  const logoUrl = findStandingsLogo(teamName) || getTeamLogo(teamName);
+  if (!logoUrl) {
+    logoDataCache.set(teamName, null);
+    return null;
+  }
+
+  try {
+    const dataUrl = await fetchImageAsDataUrl(logoUrl);
+    logoDataCache.set(teamName, dataUrl);
+    return dataUrl;
+  } catch (err) {
+    console.error('Logo konnte nicht geladen werden:', teamName, err);
+    logoDataCache.set(teamName, null);
+    return null;
+  }
+}
+
+async function preloadTeamLogosForPdf() {
+  const names = teams.map(team => team.name);
+  const payloads = await Promise.all(names.map(name => getTeamLogoDataUrl(name)));
+
+  return names.reduce((acc, name, idx) => {
+    if (payloads[idx]) acc[name] = payloads[idx];
+    return acc;
+  }, {});
 }
 
 function renderTeamLabel(name) {
@@ -1463,16 +1509,18 @@ function chunkParticipants(participants, chunkSize = 6) {
   return chunks;
 }
 
-function formatPredictionForExport(rawPrediction) {
+function formatPredictionForExport(rawPrediction, teamName, withPoints = false) {
   if (!rawPrediction) return '–';
   const prediction = normalizePrediction(rawPrediction);
   const rank = Number.isFinite(prediction.divisionRank) ? prediction.divisionRank : '–';
   const wins = Number.isFinite(prediction.wins) ? prediction.wins : '–';
   const losses = Number.isFinite(prediction.losses) ? prediction.losses : '–';
-  return `${rank} (${wins}-${losses})`;
+  const teamPoints = withPoints ? calculateTeamPoints(teamName, prediction) : null;
+  const pointLabel = typeof teamPoints === 'number' ? ` • ${teamPoints} Pkt` : '';
+  return `${rank} (${wins}-${losses})${pointLabel}`;
 }
 
-function buildOverviewPdfRows(participants) {
+function buildOverviewPdfRows(participants, logoData) {
   const rows = [];
 
   CONFERENCE_ORDER.forEach(conf => {
@@ -1492,12 +1540,12 @@ function buildOverviewPdfRows(participants) {
 
         const row = [
           isFirstRow ? `${conf} ${div}` : '',
-          recordLabel ? `${teamName} (${recordLabel})` : teamName,
+          { content: recordLabel || '', raw: { teamName, logo: logoData?.[teamName] } },
         ];
 
         participants.forEach(player => {
           const predictions = getParticipantPredictions(player);
-          row.push(formatPredictionForExport(predictions?.[teamName]));
+          row.push(formatPredictionForExport(predictions?.[teamName], teamName, true));
         });
 
         rows.push(row);
@@ -1511,7 +1559,7 @@ function buildOverviewPdfRows(participants) {
   return rows;
 }
 
-function handleOverviewPdfExport() {
+async function handleOverviewPdfExport() {
   const locked = isLocked();
   const participants = getOverviewParticipants();
   updateOverviewExportButtons(locked, participants);
@@ -1542,12 +1590,18 @@ function handleOverviewPdfExport() {
     return;
   }
 
+  elements.overviewStatus.textContent = 'PDF-Export wird vorbereitet…';
+  const logoData = await preloadTeamLogosForPdf();
+
   const { jsPDF } = pdfLib;
   const doc = new jsPDF({ orientation: 'landscape', unit: 'pt' });
-  const margin = 24;
-  const participantGroups = chunkParticipants(participants, 5);
-
-  elements.overviewStatus.textContent = 'PDF-Export wird vorbereitet…';
+  const margin = 16;
+  const participantGroups = participants.length ? [participants] : [];
+  const headerPoints = participant => {
+    const total = calculateUserTotalPoints(getParticipantPredictions(participant));
+    if (typeof total === 'number') return `${participant.name} (${total} Pkt)`;
+    return participant.name || 'Unbekannt';
+  };
 
   try {
     participantGroups.forEach((group, idx) => {
@@ -1560,21 +1614,38 @@ function handleOverviewPdfExport() {
       doc.setFontSize(11);
       doc.text(`Saison ${predictionSeason} • Spieler: ${group.map(p => p.name).join(', ')}`, margin, margin + 16);
 
-      const head = [['Division', 'Team (Standings)', ...group.map(p => p.name || 'Unbekannt')]];
-      const body = buildOverviewPdfRows(group);
+      const head = [['Division', 'Team (Record)', ...group.map(headerPoints)]];
+      const body = buildOverviewPdfRows(group, logoData);
 
       doc.autoTable({
         head,
         body,
         startY: margin + 28,
         theme: 'grid',
-        styles: { fontSize: 8, cellPadding: 4, overflow: 'linebreak' },
+        styles: { fontSize: 7, cellPadding: 2, overflow: 'linebreak' },
         headStyles: { fillColor: [24, 69, 158], textColor: 255, fontStyle: 'bold' },
         columnStyles: {
-          0: { cellWidth: 80 },
-          1: { cellWidth: 170 },
+          0: { cellWidth: 70 },
+          1: { cellWidth: 80, minCellHeight: 26 },
         },
         margin: { left: margin, right: margin, bottom: margin },
+        tableWidth: 'auto',
+        rowPageBreak: 'avoid',
+        didDrawCell(data) {
+          if (data.section !== 'body' || data.column.index !== 1) return;
+          const logo = data.cell.raw?.logo;
+          if (!logo) return;
+
+          const size = 22;
+          const x = data.cell.x + 4;
+          const y = data.cell.y + (data.cell.height - size) / 2;
+
+          try {
+            doc.addImage(logo, 'PNG', x, y, size, size);
+          } catch (err) {
+            console.error('Logo konnte nicht in die PDF eingefügt werden:', data.cell.raw?.teamName, err);
+          }
+        },
       });
     });
 
