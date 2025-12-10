@@ -439,17 +439,32 @@ button { font-family: inherit; }
   gap: 8px;
 }
 
+
 .stat-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
+  padding: 6px 4px;
 }
 
 .stat-row__team {
+  display: contents;
+}
+
+.stat-row__name {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stat-name {
+  font-weight: 700;
+}
+
+.stat-city {
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .team-name {
@@ -477,9 +492,25 @@ button { font-family: inherit; }
   font-weight: 700;
 }
 
-.stat-rank { font-weight: 700; color: var(--accent); }
-.stat-row__record { display: flex; align-items: center; gap: 8px; }
-.stat-pct { color: var(--muted); }
+.stat-rank {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.stat-row__record,
+.stat-row__points {
+  justify-self: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-row__points {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.stat-pct {
+  color: var(--muted);
+}
 .stat-meta { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
 
 .overview-card {

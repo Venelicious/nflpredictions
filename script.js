@@ -1281,23 +1281,23 @@ function renderStats(data) {
       list.className = 'stats-division__list';
 
       divisionTeams.forEach((entry, idx) => {
+        const { city, alias } = splitTeamName(entry.team.name);
+        const recordLabel = `${entry.stats.wins}-${entry.stats.losses}`;
+        const pointsLabel =
+          entry.stats.pct >= 0 ? (entry.stats.pct * 100).toFixed(1) : '–';
         const row = document.createElement('div');
         row.className = 'stat-row';
         row.innerHTML = `
           <div class="stat-row__team">
             <span class="stat-rank">${idx + 1}.</span>
-            <img src="${entry.stats.logo}" alt="${entry.team.name} Logo" class="team-logo" loading="lazy" />
-            <div>
-              <strong>${entry.team.name}</strong>
-              <p class="stat-meta">${entry.stats.note}</p>
+            <div class="stat-row__name">
+              <span class="stat-name">${alias || entry.team.name}</span>
+              ${city && alias ? `<span class="stat-city">${city}</span>` : ''}
+              ${entry.stats.note ? `<span class="stat-meta">${entry.stats.note}</span>` : ''}
             </div>
           </div>
-          <div class="stat-row__record">
-            <span>${entry.stats.wins}-${entry.stats.losses}</span>
-            <span class="stat-pct">${
-              entry.stats.pct >= 0 ? (entry.stats.pct * 100).toFixed(1) + '%' : '–'
-            }</span>
-          </div>
+          <div class="stat-row__record" aria-label="Bilanz">${recordLabel}</div>
+          <div class="stat-row__points" aria-label="Punkte">${pointsLabel}</div>
         `;
         list.appendChild(row);
       });
