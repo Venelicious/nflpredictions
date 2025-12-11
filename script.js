@@ -1391,8 +1391,10 @@ function renderStats(data) {
               ${entry.stats.note ? `<span class="stat-meta">${entry.stats.note}</span>` : ''}
             </div>
           </div>
-          <div class="stat-row__record" aria-label="Bilanz">${recordLabel}</div>
-          <div class="stat-row__points" aria-label="Punkte">${pointsLabel}</div>
+          <div class="stat-row__metrics">
+            <div class="stat-row__record" aria-label="Bilanz">${recordLabel}</div>
+            <div class="stat-row__points" aria-label="Punkte">${pointsLabel}%</div>
+          </div>
         `;
         list.appendChild(row);
       });
