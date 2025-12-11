@@ -1382,9 +1382,12 @@ function renderStats(data) {
         row.innerHTML = `
           <div class="stat-row__team">
             <span class="stat-rank">${idx + 1}.</span>
+            <img src="${entry.stats.logo}" alt="${entry.team.name} Logo" class="team-logo" loading="lazy" />
             <div class="stat-row__name">
-              <span class="stat-name">${alias || entry.team.name}</span>
-              ${city && alias ? `<span class="stat-city">${city}</span>` : ''}
+              <span class="team-name team-name--stacked">
+                ${city ? `<span class="team-name__city">${city}</span>` : ''}
+                <span class="team-name__alias">${alias || entry.team.name}</span>
+              </span>
               ${entry.stats.note ? `<span class="stat-meta">${entry.stats.note}</span>` : ''}
             </div>
           </div>
