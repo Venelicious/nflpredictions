@@ -1449,9 +1449,9 @@ function getParticipantPredictions(participant) {
 }
 
 function listParticipants() {
+  // Nur registrierte Benutzer werden für das Scoreboard berücksichtigt.
   const users = auth.users || [];
-  const coPlayers = readCoPlayers();
-  return sortByName([...users, ...coPlayers]);
+  return sortByName(users);
 }
 
 function hasMeaningfulPredictions(predictions) {
@@ -1472,8 +1472,7 @@ function hasMeaningfulPredictions(predictions) {
 function getOverviewParticipants() {
   return listParticipants().filter(player => {
     const name = (player.name || '').trim();
-    if (name === 'DU' || name === 'Venelicious') return false;
-    return hasMeaningfulPredictions(getParticipantPredictions(player));
+hasMeaningfulPredictions(getParticipantPredictions(player));
   });
 }
 
@@ -1678,7 +1677,130 @@ async function handleOverviewPdfExport() {
   }
 }
 
-function buildOverviewScoreboard(participants, options = {}) {
+
+function buildOverviewScoreboard(participants) {
+  if (!standingsSnapshot) return null;
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "overview-scoreboard";
+
+  const headerRow = document.createElement("div");
+  headerRow.className = "scoreboard__header-row";
+
+  const standingsHeader = document.createElement("div");
+  standingsHeader.className = "scoreboard__cell scoreboard__cell--header";
+  standingsHeader.innerHTML = `<strong>Standings</strong>`;
+  headerRow.appendChild(standingsHeader);
+
+  participants.forEach(player => {
+    const totalPoints = calculateUserTotalPoints(
+      getParticipantPredictions(player)
+    );
+
+    const col = document.createElement("div");
+    col.className = "scoreboard__cell scoreboard__cell--header";
+    col.innerHTML = `
+      <div class="scoreboard__player-name">${player.name}</div>
+      <div class="scoreboard__player-points">${totalPoints ?? 0} Punkte</div>
+    `;
+    headerRow.appendChild(col);
+  });
+
+  wrapper.appendChild(headerRow);
+
+  const grid = document.createElement("div");
+  grid.className = "scoreboard-grid";
+
+  const divisions = {};
+  teams.forEach(team => {
+    const id = `${team.conference} ${team.division}`;
+    if (!divisions[id]) divisions[id] = [];
+    divisions[id].push(team);
+  });
+
+  const order = [
+    "AFC East","AFC North","AFC South","AFC West",
+    "NFC East","NFC North","NFC South","NFC West"
+  ];
+
+  order.forEach(divName => {
+    const block = document.createElement("div");
+    block.className = "scoreboard-division-block";
+
+    const h = document.createElement("h4");
+    h.textContent = divName;
+    block.appendChild(h);
+
+    const colStandings = document.createElement("div");
+    colStandings.className = "scoreboard-division-col";
+
+    const rightCols = participants.map(() => {
+      const c = document.createElement("div");
+      c.className = "scoreboard-division-col";
+      return c;
+    });
+
+    const teamsInDiv = divisions[divName] || [];
+    const ordered = teamsInDiv.sort(
+      (a, b) =>
+        standingsSnapshot.divisionRanks[a.name] -
+        standingsSnapshot.divisionRanks[b.name]
+    );
+
+    ordered.forEach(team => {
+      const a = standingsSnapshot.teamStats[team.name];
+      const { alias } = splitTeamName(team.name);
+      const logo = getTeamLogo(team.name);
+
+      const leftRow = document.createElement("div");
+      leftRow.className = "scoreboard-team-compact";
+
+      leftRow.innerHTML = `
+        <div class="team-left">
+          <span class="rank">${standingsSnapshot.divisionRanks[team.name]}.</span>
+          <img src="${logo}" class="team-icon" />
+          <span class="alias">${alias}</span>
+        </div>
+        <div class="record">${a.wins}-${a.losses}</div>
+      `;
+      colStandings.appendChild(leftRow);
+
+      participants.forEach((p, idx) => {
+        const pred = normalizePrediction(
+          getParticipantPredictions(p)?.[team.name]
+        );
+        const pts = calculateTeamPoints(team.name, pred) ?? 0;
+
+        const r = document.createElement("div");
+        r.className = "scoreboard-team-compact";
+
+        r.innerHTML = `
+          <div class="team-right">
+            <img src="${logo}" class="team-icon" />
+            <span class="record">${pred.wins}-${pred.losses}</span>
+          </div>
+          <div class="points">${pts}P</div>
+        `;
+
+        rightCols[idx].appendChild(r);
+      });
+    });
+
+    const columns = document.createElement("div");
+    columns.className = "scoreboard-division-grid";
+
+    columns.appendChild(colStandings);
+    rightCols.forEach(c => columns.appendChild(c));
+
+    block.appendChild(columns);
+    grid.appendChild(block);
+  });
+
+  wrapper.appendChild(grid);
+  return wrapper;
+}
+
+) {
   if (!standingsSnapshot) return null;
 
   const { title = 'Scoreboard', subtitle = '', hint = '' } = options;
