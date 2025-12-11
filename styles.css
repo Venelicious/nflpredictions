@@ -380,6 +380,7 @@ button { font-family: inherit; }
   width: 28px;
   height: 28px;
   object-fit: contain;
+  display: block;
 }
 
 .record-inputs { display: inline-flex; align-items: center; gap: 6px; }
@@ -428,10 +429,30 @@ button { font-family: inherit; }
 .prediction-list { gap: 10px; }
 
 .prediction-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   padding: 8px;
   border: 1px solid var(--gray-200);
   border-radius: 10px;
   background: #fff;
+}
+
+.stat-row__team {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1 1 50%;
+  min-width: 0;
+}
+
+.stat-row__record {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: flex-end;
+  flex: 0 0 auto;
 }
 
 .prediction-row input[type='number'] { width: 72px; text-align: center; }
@@ -439,6 +460,16 @@ button { font-family: inherit; }
 .prediction-team input { width: 56px; }
 .prediction-record { gap: 8px; }
 .prediction-record input { width: 76px; }
+
+.team-name {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.team-name__city { color: var(--gray-500); font-size: 13px; }
+
+.team-name__alias { font-weight: 800; }
 
 .stats-division__list { display: grid; gap: 8px; }
 
