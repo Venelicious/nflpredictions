@@ -462,14 +462,30 @@ button { font-family: inherit; }
 .prediction-record input { width: 76px; }
 
 .team-name {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.2;
+  display: inline-flex;
+  align-items: baseline;
+  flex-direction: row;
+  gap: 4px;
+  line-height: 1.1;
+  white-space: nowrap;
+  max-width: 100%;
+  min-width: 0;
 }
 
-.team-name__city { color: var(--gray-500); font-size: 13px; }
+.team-name__city {
+  color: var(--gray-500);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
 
-.team-name__alias { font-weight: 800; }
+.team-name__alias {
+  font-weight: 800;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
 
 .stats-division__list { display: grid; gap: 8px; }
 
@@ -692,6 +708,18 @@ footer {
 }
 
 .hidden { display: none !important; }
+
+@media (max-width: 540px) {
+  .prediction-row { gap: 8px; }
+  .stat-row__team { gap: 8px; }
+  .prediction-team input { width: 50px; }
+  .prediction-record { gap: 6px; }
+  .prediction-record input { width: 68px; }
+  .team-logo { width: 24px; height: 24px; }
+  .team-name { font-size: 13px; }
+  .team-name__alias { font-size: 13px; }
+  .team-name__city { font-size: 11px; }
+}
 
 @media (max-width: 768px) {
   .auth-area { width: 100%; justify-content: flex-end; }
