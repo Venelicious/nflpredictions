@@ -465,9 +465,9 @@ button { font-family: inherit; }
 .stat-row__metrics .stat-row__record { font-weight: 800; }
 .stat-row__points { color: var(--gray-500); font-size: 13px; }
 
-.prediction-row input[type='number'] { width: 64px; text-align: center; }
+.prediction-row input[type='number'] { width: 48px; text-align: center; }
 .prediction-team { gap: 10px; }
-.prediction-team input { width: 48px; }
+.prediction-team input { width: 24px; }
 .prediction-record {
   display: flex;
   align-items: center;
@@ -475,7 +475,7 @@ button { font-family: inherit; }
   justify-content: flex-end;
   flex: 0 0 auto;
 }
-.prediction-record input { width: 64px; }
+.prediction-record input { width: 32px; }
 
 .team-name {
   display: inline-flex;
@@ -587,14 +587,10 @@ button { font-family: inherit; }
   border: 1px solid rgba(12, 159, 111, 0.5);
 }
 
-.overview-scoreboard {
-  margin-bottom: 16px;
-  border: 1px solid var(--gray-200);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  background: #fff;
-  padding: 12px;
-  overflow-x: auto;
+
+
+.overview-scoreboard::-webkit-scrollbar {
+  height: 6px;
 }
 
 .overview-scoreboard--export { overflow: visible; }
@@ -621,7 +617,7 @@ button { font-family: inherit; }
   width: 100%;
   border-collapse: separate;
   border-spacing: 10px;
-  min-width: 640px;
+  min-width: max-content !important;
 }
 
 .scoreboard__cell {
@@ -678,6 +674,16 @@ button { font-family: inherit; }
 .scoreboard__bonus-label { font-weight: 800; }
 .scoreboard__bonus-hint { font-size: 12px; color: var(--gray-500); }
 
+
+
+
+
+/* -------------------------------------------- */
+/* SCOREBOARD HEADER fixed horizontal alignment */
+/* -------------------------------------------- */
+
+
+
 .print-sheet {
   background: #fff;
   border: 1px solid var(--gray-200);
@@ -704,7 +710,7 @@ button { font-family: inherit; }
 .print-sheet__meta,
 .print-sheet__players { margin: 2px 0 0; color: #4b5563; font-size: 14px; }
 
-.print-sheet .overview-scoreboard { overflow: visible; box-shadow: none; }
+.print-sheet 
 
 @page {
   size: A4 landscape;
@@ -745,9 +751,9 @@ footer {
 @media (max-width: 540px) {
   .prediction-row { gap: 8px; }
   .stat-row__team { gap: 8px; }
-  .prediction-team input { width: 42px; }
+  .prediction-team input { width: 24px; }
   .prediction-record { gap: 6px; }
-  .prediction-record input { width: 58px; }
+  .prediction-record input { width: 36px; }
   .team-logo { width: 24px; height: 24px; }
   .team-name { font-size: 13px; }
   .team-name__alias { font-size: 13px; }
@@ -758,4 +764,116 @@ footer {
   .auth-area { width: 100%; justify-content: flex-end; }
   .auth-form { grid-template-columns: 1fr; }
   .tab-nav { flex-direction: column; }
+}
+
+/* ============================= */
+/* CLEAN SCOREBOARD FIXES (v2)   */
+/* ============================= */
+
+/* Header stays horizontal */
+.overview-scoreboard {
+  margin-bottom: 16px;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  background: #fff;
+  padding: 12px;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+.scoreboard__header-row {
+  display: grid !important;
+  grid-template-columns: var(--scoreboard-columns) !important;
+  align-items: center;
+  min-width: max-content !important;
+}
+
+/* Divisions vertically stacked */
+.scoreboard-grid {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 20px !important;
+  width: 100%;
+}
+
+/* Prevent collapse + enable scroll width */
+.scoreboard {
+  min-width: max-content !important;
+  width: 100%;
+}
+
+.scoreboard__bonus-row {
+  display: grid !important;
+  grid-template-columns: var(--scoreboard-columns) !important;
+  min-width: max-content !important;
+}
+
+/* Ensure cells don't stretch weirdly */
+.scoreboard__cell {
+  white-space: normal !important;
+}
+
+/* Mobile improvements */
+@media (max-width: 540px) {
+  .scoreboard__team-row img {
+    width: 22px !important;
+    height: 22px !important;
+  }
+}
+
+.scoreboard-division-block {
+  margin-bottom: 22px;
+}
+
+.scoreboard-division-grid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-gap: 12px;
+  width: max-content;
+}
+
+.scoreboard-division-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.scoreboard-team-compact {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.team-left,
+.team-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.team-icon {
+  width: 22px;
+  height: 22px;
+}
+
+.rank {
+  font-weight: 700;
+}
+
+.alias {
+  font-weight: 700;
+}
+
+.team-record,
+.pred-record {
+  font-size: 13px;
+  color: var(--gray-500);
+}
+
+.team-points {
+  font-weight: 800;
+  color: var(--navy-3);
 }
