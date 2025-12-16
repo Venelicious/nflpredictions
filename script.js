@@ -1455,25 +1455,31 @@ function listParticipants() {
 }
 
 function hasMeaningfulPredictions(predictions) {
+
+  if (!predictions) return false;
+
   const baseline = defaultPredictions();
 
-  return Object.entries(predictions || {}).some(([team, entry]) => {
+  return Object.entries(predictions).some(([team, entry]) => {
     const normalized = normalizePrediction(entry);
     const defaultEntry = normalizePrediction(baseline[team]);
 
-    return (
+    if (
       normalized.divisionRank !== defaultEntry.divisionRank ||
       normalized.wins !== defaultEntry.wins ||
       normalized.losses !== defaultEntry.losses
-    );
+    ) {
+      return true;
+    }
+    return false;
   });
 }
 
+
 function getOverviewParticipants() {
-  return listParticipants().filter(player => {
-    const name = (player.name || '').trim();
-hasMeaningfulPredictions(getParticipantPredictions(player));
-  });
+  return listParticipants().filter(player =>
+    hasMeaningfulPredictions(getParticipantPredictions(player))
+  );
 }
 
 function updateOverviewExportButtons(locked, participants) {
@@ -1501,7 +1507,8 @@ function updateOverviewExportButtons(locked, participants) {
 function renderPredictionsOverview() {
   const locked = isLocked();
   elements.overviewContent.innerHTML = '';
-  const participants = getOverviewParticipants();
+
+const participants = getOverviewParticipants();
   updateOverviewExportButtons(locked, participants);
   const standingsAvailable = Boolean(standingsSnapshot);
 
@@ -1677,136 +1684,13 @@ async function handleOverviewPdfExport() {
   }
 }
 
-
-function buildOverviewScoreboard(participants) {
-  if (!standingsSnapshot) return null;
-
-  const wrapper = document.createElement("div");
-  wrapper.className = "overview-scoreboard";
-
-  const headerRow = document.createElement("div");
-  headerRow.className = "scoreboard__header-row";
-
-  const standingsHeader = document.createElement("div");
-  standingsHeader.className = "scoreboard__cell scoreboard__cell--header";
-  standingsHeader.innerHTML = `<strong>Standings</strong>`;
-  headerRow.appendChild(standingsHeader);
-
-  participants.forEach(player => {
-    const totalPoints = calculateUserTotalPoints(
-      getParticipantPredictions(player)
-    );
-
-    const col = document.createElement("div");
-    col.className = "scoreboard__cell scoreboard__cell--header";
-    col.innerHTML = `
-      <div class="scoreboard__player-name">${player.name}</div>
-      <div class="scoreboard__player-points">${totalPoints ?? 0} Punkte</div>
-    `;
-    headerRow.appendChild(col);
-  });
-
-  wrapper.appendChild(headerRow);
-
-  const grid = document.createElement("div");
-  grid.className = "scoreboard-grid";
-
-  const divisions = {};
-  teams.forEach(team => {
-    const id = `${team.conference} ${team.division}`;
-    if (!divisions[id]) divisions[id] = [];
-    divisions[id].push(team);
-  });
-
-  const order = [
-    "AFC East","AFC North","AFC South","AFC West",
-    "NFC East","NFC North","NFC South","NFC West"
-  ];
-
-  order.forEach(divName => {
-    const block = document.createElement("div");
-    block.className = "scoreboard-division-block";
-
-    const h = document.createElement("h4");
-    h.textContent = divName;
-    block.appendChild(h);
-
-    const colStandings = document.createElement("div");
-    colStandings.className = "scoreboard-division-col";
-
-    const rightCols = participants.map(() => {
-      const c = document.createElement("div");
-      c.className = "scoreboard-division-col";
-      return c;
-    });
-
-    const teamsInDiv = divisions[divName] || [];
-    const ordered = teamsInDiv.sort(
-      (a, b) =>
-        standingsSnapshot.divisionRanks[a.name] -
-        standingsSnapshot.divisionRanks[b.name]
-    );
-
-    ordered.forEach(team => {
-      const a = standingsSnapshot.teamStats[team.name];
-      const { alias } = splitTeamName(team.name);
-      const logo = getTeamLogo(team.name);
-
-      const leftRow = document.createElement("div");
-      leftRow.className = "scoreboard-team-compact";
-
-      leftRow.innerHTML = `
-        <div class="team-left">
-          <span class="rank">${standingsSnapshot.divisionRanks[team.name]}.</span>
-          <img src="${logo}" class="team-icon" />
-          <span class="alias">${alias}</span>
-        </div>
-        <div class="record">${a.wins}-${a.losses}</div>
-      `;
-      colStandings.appendChild(leftRow);
-
-      participants.forEach((p, idx) => {
-        const pred = normalizePrediction(
-          getParticipantPredictions(p)?.[team.name]
-        );
-        const pts = calculateTeamPoints(team.name, pred) ?? 0;
-
-        const r = document.createElement("div");
-        r.className = "scoreboard-team-compact";
-
-        r.innerHTML = `
-          <div class="team-right">
-            <img src="${logo}" class="team-icon" />
-            <span class="record">${pred.wins}-${pred.losses}</span>
-          </div>
-          <div class="points">${pts}P</div>
-        `;
-
-        rightCols[idx].appendChild(r);
-      });
-    });
-
-    const columns = document.createElement("div");
-    columns.className = "scoreboard-division-grid";
-
-    columns.appendChild(colStandings);
-    rightCols.forEach(c => columns.appendChild(c));
-
-    block.appendChild(columns);
-    grid.appendChild(block);
-  });
-
-  wrapper.appendChild(grid);
-  return wrapper;
-}
-
-) {
+function buildOverviewScoreboard(participants, options = {}) {
   if (!standingsSnapshot) return null;
 
   const { title = 'Scoreboard', subtitle = '', hint = '' } = options;
 
   const wrapper = document.createElement('div');
-  wrapper.className = 'overview-scoreboard';
+  wrapper.className = 'overview-scoreboard scoreboard-matrix';
 
   const header = document.createElement('div');
   header.className = 'overview-scoreboard__header';
@@ -1818,14 +1702,14 @@ function buildOverviewScoreboard(participants) {
     ${hint ? `<div class="hint">${hint}</div>` : ''}
   `;
 
-  const columnTemplate = `repeat(${participants.length + 1}, minmax(255px, 1fr))`;
+  const columnTemplate = `repeat(${participants.length + 1}, 1fr))`;
 
   wrapper.style.setProperty('--scoreboard-columns', columnTemplate);
 
   wrapper.appendChild(header);
 
   const headerRow = document.createElement('div');
-  headerRow.className = 'scoreboard__header-row scoreboard__header-row--global';
+  headerRow.className = 'scoreboard__header-row scoreboard__header-row--global scoreboard-row';
 
   const standingsHeader = document.createElement('div');
   standingsHeader.className = 'scoreboard__cell scoreboard__cell--header';
@@ -1848,14 +1732,19 @@ function buildOverviewScoreboard(participants) {
   wrapper.appendChild(headerRow);
 
   const grid = document.createElement('div');
-  grid.className = 'scoreboard-grid';
+  grid.className = 'scoreboard-grid scoreboard-grid--matrix';
 
   CONFERENCE_ORDER.forEach(conf => {
     STAT_DIVISION_ORDER.forEach(div => {
       const divisionStandings = standingsSnapshot?.divisions?.[conf]?.[div] || [];
       const scoreboard = document.createElement('div');
       scoreboard.className = 'scoreboard';
-      scoreboard.innerHTML = `<div class="scoreboard__title">${conf} ${div}</div>`;
+      scoreboard.innerHTML = `
+   <div class="division-banner division-banner--${conf.toLowerCase()}">
+     <span class="banner-conf">${conf}</span>
+     <span class="banner-div">${div}</span>
+   </div>
+ `;
 
       const divisionTeams = teams.filter(team => team.conference === conf && team.division === div);
 
@@ -1874,18 +1763,11 @@ function buildOverviewScoreboard(participants) {
       const bonusRow = document.createElement('div');
       bonusRow.className = 'scoreboard__row scoreboard__bonus-row';
 
-      const bonusLabel = document.createElement('div');
-      bonusLabel.className = 'scoreboard__cell scoreboard__cell--info';
-      bonusLabel.innerHTML = `
-        <div class="scoreboard__bonus-label">Perfektes Ranking</div>
-        <div class="scoreboard__bonus-hint">+1 Punkt pro Division</div>
-      `;
-      bonusRow.appendChild(bonusLabel);
 
       userDivisionPredictions.forEach(({ entries }) => {
         const bonus = calculateDivisionBonus(entries);
         const cell = document.createElement('div');
-        cell.className = 'scoreboard__cell scoreboard__cell--bonus';
+        cell.className = 'scoreboard__cell scoreboard__cell--bonus bonus-compact';
         cell.innerHTML = `
           <div class="bonus-chip ${bonus ? 'bonus-chip--active' : ''}">
             ${bonus ? '⭐️ +1' : '–'}
@@ -1899,19 +1781,22 @@ function buildOverviewScoreboard(participants) {
 
       for (let i = 0; i < maxRows; i++) {
         const row = document.createElement('div');
-        row.className = 'scoreboard__row';
+        row.className = 'scoreboard__row scoreboard__row--matrix';
 
         const actualEntry = divisionStandings[i];
         const actualCell = document.createElement('div');
-        actualCell.className = 'scoreboard__cell';
+        actualCell.className = 'scoreboard__cell scoreboard__cell--actual cell-standings';
+
         if (actualEntry) {
+          const { alias } = splitTeamName(actualEntry.team.name);
+          const displayName = alias || actualEntry.team.name;
           actualCell.innerHTML = `
-            <div class="scoreboard__team-row">
+            <div class="scoreboard__team-row scoreboard__team-row--actual">
               <span class="scoreboard__rank">${i + 1}.</span>
               <img src="${actualEntry.stats.logo}" alt="${actualEntry.team.name} Logo" class="team-logo" loading="lazy" />
-              <span class="team-name">${actualEntry.team.name}</span>
+              <span class="team-name team-name--alias">${displayName}</span>
+              <span class="scoreboard__record">${actualEntry.stats.wins}-${actualEntry.stats.losses}</span>
             </div>
-            <div class="scoreboard__record">${actualEntry.stats.wins}-${actualEntry.stats.losses}</div>
           `;
         } else {
           actualCell.textContent = '–';
@@ -1921,7 +1806,7 @@ function buildOverviewScoreboard(participants) {
         userDivisionPredictions.forEach(({ entries }) => {
           const predicted = entries[i];
           const cell = document.createElement('div');
-          cell.className = 'scoreboard__cell';
+          cell.className = 'scoreboard__cell scoreboard__cell--prediction prediction-compact';
 
           if (predicted) {
             const teamPoints = calculateTeamPoints(predicted.team.name, predicted.prediction);
@@ -1929,13 +1814,11 @@ function buildOverviewScoreboard(participants) {
               typeof teamPoints === 'number' ? `${teamPoints} Punkt${teamPoints === 1 ? '' : 'e'}` : '–';
 
             cell.innerHTML = `
-              <div class="scoreboard__team-row">
-                <span class="scoreboard__rank">${predicted.prediction.divisionRank}.</span>
+              <div class="scoreboard__team-row scoreboard__team-row--predicted">
                 <img src="${getTeamLogo(predicted.team.name)}" alt="${predicted.team.name} Logo" class="team-logo" loading="lazy" />
-                <span class="team-name">${predicted.team.name}</span>
+                <span class="scoreboard__record">${predicted.prediction.wins}-${predicted.prediction.losses}</span>
+                <span class="team-points">${pointsLabel}</span>
               </div>
-              <div class="scoreboard__record">Tipp: ${predicted.prediction.wins}-${predicted.prediction.losses}</div>
-              <div class="scoreboard__team-points">${pointsLabel}</div>
             `;
           } else {
             cell.textContent = '–';
@@ -1946,6 +1829,7 @@ function buildOverviewScoreboard(participants) {
 
         scoreboard.appendChild(row);
       }
+
 
       grid.appendChild(scoreboard);
     });
