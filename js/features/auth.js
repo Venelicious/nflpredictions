@@ -7,6 +7,7 @@ import { defaultPredictions } from './predictions.js';
 export const auth = {
   currentUserEmail: '',
   profiles: {},
+  season: '2025',
 
   async init() {
     try {
