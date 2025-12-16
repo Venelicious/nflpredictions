@@ -2,13 +2,18 @@
 import { auth } from './features/auth.js';
 import { dom } from './ui/dom.js';
 import { renderScoreboard } from './ui/renderScoreboard.js';
+import { renderPredictions } from './ui/renderPredictions.js';
+import { renderStats } from './ui/renderStats.js';
 import { extractStandings } from './data/standings.js';
+import { defaultPredictions, normalizePrediction } from './features/predictions.js';
+import { apiClient } from './api/apiClient.js';
 
 let standingsSnapshot = null;
 
 async function init() {
   setupAuthForms();
   setupTabs();
+  setupPredictionInteractions();
 
   await auth.init();
   updateAuthUI();
@@ -35,6 +40,11 @@ function setupAuthForms() {
   dom.loginForm?.addEventListener('submit', onLoginSubmit);
   dom.registerForm?.addEventListener('submit', onRegisterSubmit);
   dom.logoutBtn?.addEventListener('click', onLogout);
+}
+
+function setupPredictionInteractions() {
+  dom.predictionsContent?.addEventListener('input', onPredictionInput);
+  dom.savePredictions?.addEventListener('click', onSavePredictions);
 }
 
 function toggleAuthForm(mode) {
@@ -134,12 +144,81 @@ function updateAuthUI() {
 function render() {
   if (!standingsSnapshot) return;
 
+  const user = auth.getUser(auth.currentUser);
+  const predictions = user
+    ? user.predictionsBySeason?.[auth.season] || defaultPredictions()
+    : null;
+
+  if (user) {
+    renderPredictions(dom.predictionsContent, predictions);
+  }
+
+  renderScoreboardView();
+  renderStats(dom.statsContent, standingsSnapshot);
+}
+
+function renderScoreboardView() {
   renderScoreboard({
     container: dom.overviewContent,
     participants: auth.users,
     standingsSnapshot,
-    getParticipantPredictions: p => p.predictionsBySeason?.['2025'],
+    getParticipantPredictions: p => p.predictionsBySeason?.[auth.season],
   });
+}
+
+function onPredictionInput(event) {
+  const input = event.target;
+  if (!(input instanceof HTMLInputElement)) return;
+  const row = input.closest('.prediction-row');
+  if (!row) return;
+
+  const team = row.dataset.team;
+  const field = input.name;
+  if (!team || !['wins', 'losses', 'divisionRank'].includes(field)) return;
+
+  const user = auth.getUser(auth.currentUser);
+  if (!user) return;
+
+  const predictions = {
+    ...(user.predictionsBySeason?.[auth.season] || defaultPredictions()),
+  };
+
+  predictions[team] = normalizePrediction({
+    ...(predictions[team] || {}),
+    [field]: input.value,
+  });
+
+  auth.profiles[user.email] = {
+    ...user,
+    predictionsBySeason: {
+      ...(user.predictionsBySeason || {}),
+      [auth.season]: predictions,
+    },
+  };
+
+  renderScoreboardView();
+}
+
+async function onSavePredictions() {
+  const user = auth.getUser(auth.currentUser);
+  if (!user) return;
+
+  const predictions = user.predictionsBySeason?.[auth.season] || defaultPredictions();
+
+  setStatus(dom.predictionStatus, 'Speichere ...');
+  dom.savePredictions.disabled = true;
+
+  try {
+    await apiClient.saveTip({
+      season: auth.season,
+      payload: predictions,
+    });
+    setStatus(dom.predictionStatus, 'Gespeichert');
+  } catch (err) {
+    setStatus(dom.predictionStatus, err.message || 'Konnte nicht speichern', true);
+  } finally {
+    dom.savePredictions.disabled = false;
+  }
 }
 
 init();
