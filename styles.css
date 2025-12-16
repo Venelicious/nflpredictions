@@ -18,6 +18,8 @@
 
 * { box-sizing: border-box; }
 
+.hidden { display: none !important; }
+
 body {
   margin: 0;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
@@ -154,6 +156,68 @@ main { padding: 32px 24px 48px; max-width: 1220px; margin: 0 auto; }
 
 .welcome__name { margin: 0; font-weight: 800; }
 .welcome__email { margin: 0; color: var(--gray-400); font-size: 14px; }
+
+/* ---------- Modal ---------- */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(11, 20, 36, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+.modal__content {
+  position: relative;
+  background: #fff;
+  border-radius: 16px;
+  padding: 22px;
+  max-width: 480px;
+  width: min(92vw, 520px);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.24);
+  border: 1px solid var(--gray-200);
+  animation: pop 160ms ease-out;
+}
+
+.modal__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.modal__eyebrow { text-transform: uppercase; letter-spacing: 0.6px; color: var(--gray-500); font-weight: 800; margin: 0; }
+.modal__header h2 { margin: 0; }
+
+.modal__form { display: grid; gap: 12px; }
+.modal__actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+.icon-button {
+  background: var(--gray-100);
+  border: 1px solid var(--gray-200);
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--navy-2);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+@keyframes pop {
+  from { transform: translateY(6px) scale(0.97); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
 
 button.secondary {
   background: #fff;

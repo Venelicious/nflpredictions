@@ -32,23 +32,6 @@
         </p>
       </form>
 
-      <form id="registerForm" class="auth-form hidden" autocomplete="on">
-        <input id="registerName" type="text" placeholder="Name" required />
-        <input id="registerEmail" type="email" placeholder="E-Mail" required />
-        <input
-          id="registerPassword"
-          type="password"
-          placeholder="Passwort (mind. 6 Zeichen)"
-          required
-        />
-        <button type="submit">Registrieren</button>
-        <p id="registerStatus" class="helper status"></p>
-        <p class="helper">
-          Bereits dabei?
-          <button id="showLogin" type="button" class="linkish">Zum Login</button>
-        </p>
-      </form>
-
       <div id="welcomeBox" class="welcome hidden">
         <div>
           <p id="welcomeNameHeader" class="welcome__name"></p>
@@ -121,6 +104,58 @@
   <footer>
     NFL Predictions · made with ❤️
   </footer>
+
+  <!-- ================= REGISTRATION MODAL ================= -->
+  <div id="registerModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="registerTitle">
+    <div class="modal__backdrop" id="registerModalBackdrop"></div>
+    <div class="modal__content">
+      <header class="modal__header">
+        <div>
+          <p class="modal__eyebrow">Konto anlegen</p>
+          <h2 id="registerTitle">Registrieren</h2>
+        </div>
+        <button id="closeRegisterModal" type="button" class="icon-button" aria-label="Schließen">
+          ×
+        </button>
+      </header>
+
+      <form id="registerForm" class="modal__form" autocomplete="on">
+        <label class="form-field">
+          <span>Benutzername</span>
+          <input id="registerName" type="text" placeholder="Dein Anzeigename" required />
+        </label>
+        <label class="form-field">
+          <span>E-Mail</span>
+          <input id="registerEmail" type="email" placeholder="E-Mail" required />
+        </label>
+        <label class="form-field">
+          <span>Passwort</span>
+          <input
+            id="registerPassword"
+            type="password"
+            placeholder="Passwort (mind. 6 Zeichen)"
+            required
+          />
+        </label>
+        <label class="form-field">
+          <span>Passwort bestätigen</span>
+          <input
+            id="registerPasswordConfirm"
+            type="password"
+            placeholder="Passwort erneut eingeben"
+            required
+          />
+        </label>
+
+        <p id="registerStatus" class="status"></p>
+
+        <div class="modal__actions">
+          <button type="submit" class="cta">Registrieren</button>
+          <button id="showLogin" type="button" class="secondary">Zum Login</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <!-- ================= MODULE ENTRY ================= -->
   <script type="module" src="./js/main.js"></script>

@@ -54,10 +54,16 @@ async function onRegisterSubmit(_event, helpers) {
   setFormDisabled(dom.registerForm, true);
 
   try {
+    const password = dom.registerPassword.value.trim();
+    const confirm = dom.registerPasswordConfirm?.value.trim();
+
+    if (!dom.registerName.value.trim()) throw new Error('Benutzername fehlt');
+    if (confirm !== undefined && password !== confirm) throw new Error('Passwörter stimmen nicht überein');
+
     await auth.register({
       name: dom.registerName.value.trim(),
       email: dom.registerEmail.value.trim(),
-      password: dom.registerPassword.value.trim(),
+      password,
     });
     updateAuthUI();
     render();

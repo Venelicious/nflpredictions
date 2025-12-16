@@ -12,17 +12,33 @@ function setFormDisabled(formEl, disabled) {
   formEl.querySelectorAll('input, button').forEach(el => { el.disabled = disabled; });
 }
 
-function toggleAuthForm(mode) {
-  const toLogin = mode === 'login';
-  dom.loginForm?.classList.toggle('hidden', !toLogin);
-  dom.registerForm?.classList.toggle('hidden', toLogin);
-  dom.authArea?.classList.toggle('auth-area--logged-in', false);
+function openRegisterModal() {
+  if (!dom.registerModal) return;
+  dom.registerModal.classList.remove('hidden');
+  dom.registerModal.setAttribute('aria-hidden', 'false');
+  setStatus(dom.registerStatus, '');
+  dom.registerForm?.reset();
+  dom.registerName?.focus();
+}
+
+function closeRegisterModal() {
+  if (!dom.registerModal) return;
+  dom.registerModal.classList.add('hidden');
+  dom.registerModal.setAttribute('aria-hidden', 'true');
 }
 
 export const authUI = {
   bind({ onLoginSubmit, onRegisterSubmit, onLogout }) {
-    dom.showRegister?.addEventListener('click', () => toggleAuthForm('register'));
-    dom.showLogin?.addEventListener('click', () => toggleAuthForm('login'));
+    dom.showRegister?.addEventListener('click', () => openRegisterModal());
+    dom.showLogin?.addEventListener('click', () => {
+      closeRegisterModal();
+      dom.loginEmail?.focus();
+    });
+    dom.closeRegisterModal?.addEventListener('click', closeRegisterModal);
+    dom.registerModalBackdrop?.addEventListener('click', closeRegisterModal);
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') closeRegisterModal();
+    });
 
     dom.loginForm?.addEventListener('submit', event => {
       event.preventDefault();
@@ -43,7 +59,7 @@ export const authUI = {
     dom.welcomeBox?.classList.toggle('hidden', !isLoggedIn);
     dom.welcomeArea?.classList.toggle('hidden', !isLoggedIn);
     dom.loginForm?.classList.toggle('hidden', isLoggedIn);
-    dom.registerForm?.classList.toggle('hidden', true);
+    closeRegisterModal();
 
     if (isLoggedIn) {
       dom.headerWelcomeName.textContent = user.name || 'Coach';
@@ -60,5 +76,6 @@ export const authUI = {
 
   setStatus,
   setFormDisabled,
-  toggleAuthForm,
+  openRegisterModal,
+  closeRegisterModal,
 };
