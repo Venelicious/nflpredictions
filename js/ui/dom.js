@@ -32,6 +32,7 @@ export const dom = {
 
   predictionsContent: document.getElementById('predictionsContent'),
   statsContent: document.getElementById('statsContent'),
+  statsStatus: document.getElementById('statsStatus'),
   overviewContent: document.getElementById('overviewContent'),
   overviewStatus: document.getElementById('overviewStatus'),
 
