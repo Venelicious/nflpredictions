@@ -1079,3 +1079,176 @@ footer {
   font-size: 0.7rem;
   opacity: 0.7;
 }
+
+/* =========================================================
+   SCOREBOARD MATRIX (Phase 4)
+   ========================================================= */
+
+.scoreboard-matrix {
+  display: grid;
+  grid-template-columns: repeat(var(--cols), minmax(140px, 1fr));
+  gap: 6px;
+  align-items: stretch;
+}
+
+/* ---------- Header ---------- */
+
+.sb-header {
+  background: linear-gradient(180deg, #132038, #0b1424);
+  color: #fff;
+  border-radius: 10px;
+  padding: 8px 10px;
+  text-align: center;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+}
+
+.sb-header .sb-title {
+  font-weight: 800;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.sb-header .sb-points {
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+/* ---------- Division Banner ---------- */
+
+.sb-division {
+  grid-column: 1 / -1;
+  margin: 10px 0 4px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.sb-division.sb-afc {
+  background: linear-gradient(90deg, #c8102e, #7a0b1c);
+  color: #fff;
+}
+
+.sb-division.sb-nfc {
+  background: linear-gradient(90deg, #0c4fa3, #082f63);
+  color: #fff;
+}
+
+.sb-conf {
+  opacity: 0.9;
+}
+
+.sb-div {
+  background: rgba(255,255,255,0.15);
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+/* ---------- Cells ---------- */
+
+.sb-cell {
+  background: #fff;
+  border-radius: 10px;
+  padding: 6px 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 4px 12px rgba(12,16,32,0.12);
+  font-size: 13px;
+}
+
+/* Standings column */
+.sb-standings {
+  font-weight: 700;
+  background: linear-gradient(180deg, #f6f7f9, #eef1f5);
+}
+
+.sb-rank {
+  font-weight: 800;
+  color: #132038;
+  width: 22px;
+  text-align: right;
+}
+
+.sb-team {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sb-record {
+  font-size: 12px;
+  color: #7b8495;
+}
+
+/* Prediction cells */
+.sb-prediction {
+  justify-content: space-between;
+}
+
+.sb-prediction .sb-record {
+  font-weight: 700;
+}
+
+.sb-pts {
+  font-weight: 800;
+  font-size: 12px;
+  color: #132038;
+}
+
+/* Bonus row */
+.sb-bonus {
+  justify-content: center;
+  font-weight: 800;
+  font-size: 13px;
+  background: #f3f7ff;
+  color: #7b8495;
+}
+
+.sb-bonus.active {
+  background: rgba(12,159,111,0.15);
+  color: #0c9f6f;
+  box-shadow: 0 4px 12px rgba(12,159,111,0.25);
+}
+
+/* Empty helper */
+.sb-empty {
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Logos */
+.sb-cell .team-logo {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
+/* ---------- Mobile ---------- */
+
+@media (max-width: 900px) {
+  .scoreboard-matrix {
+    grid-template-columns: repeat(var(--cols), minmax(120px, 1fr));
+  }
+
+  .sb-header .sb-title {
+    font-size: 12px;
+  }
+
+  .sb-cell {
+    font-size: 12px;
+    padding: 5px 6px;
+  }
+}
+
+@media (max-width: 600px) {
+  .scoreboard-matrix {
+    overflow-x: auto;
+  }
+}
