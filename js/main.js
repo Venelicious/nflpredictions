@@ -82,13 +82,19 @@ async function onLogout() {
 }
 
 function loadStandings() {
+  authUI.setStatus(dom.statsStatus, '');
+  dom.overviewStatus.textContent = '';
+
   fetch('/standings.json')
     .then(r => r.json())
     .then(data => {
       standingsSnapshot = extractStandings(data);
       render();
     })
-    .catch(() => authUI.setStatus(dom.registerStatus, 'Konnte Standings nicht laden', true));
+    .catch(() => {
+      authUI.setStatus(dom.statsStatus, 'Konnte Standings nicht laden', true);
+      dom.overviewStatus.textContent = 'Konnte Standings nicht laden.';
+    });
 }
 
 function updateAuthUI() {
@@ -176,7 +182,7 @@ function onPredictionInput(event) {
     },
   };
 
-  renderScoreboardView();
+  renderScoreboardView(Boolean(user));
 }
 
 async function onSavePredictions() {

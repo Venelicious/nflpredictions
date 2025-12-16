@@ -18,7 +18,7 @@ export const DIVISION_ORDER = ['East', 'North', 'South', 'West'];
 export const STAT_DIVISION_ORDER = ['North', 'East', 'South', 'West'];
 
 export const AVAILABLE_SEASONS = [
-  { value: '2024', label: 'Saison 2024/2025 (abgeschlossen)' },
+  { value: '2024', label: 'Saison 2024/2025' },
   { value: '2025', label: 'Saison 2025/2026' },
 ];
 
