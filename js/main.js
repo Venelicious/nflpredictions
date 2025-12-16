@@ -67,6 +67,7 @@ async function onRegisterSubmit(_event, helpers) {
     });
     updateAuthUI();
     render();
+    authUI.closeRegisterModal();
   } catch (err) {
     setStatus(dom.registerStatus, err.message || 'Registrierung fehlgeschlagen', true);
   } finally {
@@ -119,6 +120,9 @@ function render() {
     authUI.setStatus(dom.predictionStatus, '');
     dom.overviewStatus.textContent = 'Melde dich an, um das Scoreboard zu sehen.';
   }
+
+  dom.predictionsActions?.classList.toggle('hidden', !user);
+  dom.savePredictions.disabled = !user;
 
   renderScoreboardView(Boolean(user));
   renderStats(dom.statsContent, standingsSnapshot);

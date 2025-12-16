@@ -35,6 +35,7 @@ export const dom = {
   overviewContent: document.getElementById('overviewContent'),
   overviewStatus: document.getElementById('overviewStatus'),
 
+  predictionsActions: document.querySelector('#predictionsTab .actions'),
   savePredictions: document.getElementById('savePredictions'),
   seasonPicker: document.getElementById('seasonPicker'),
 };
