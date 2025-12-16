@@ -98,6 +98,10 @@ function updateAuthUI() {
   authUI.renderUser(user);
   tabs?.setVisible(isLoggedIn);
 
+  // Make sure auth-only controls are hidden immediately, even before data loads
+  dom.predictionsActions?.classList.toggle('hidden', !isLoggedIn);
+  if (dom.savePredictions) dom.savePredictions.disabled = !isLoggedIn;
+
   if (!isLoggedIn) {
     tabs?.activate('predictionsTab');
   }

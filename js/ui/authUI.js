@@ -29,7 +29,10 @@ function closeRegisterModal() {
 
 export const authUI = {
   bind({ onLoginSubmit, onRegisterSubmit, onLogout }) {
-    dom.showRegister?.addEventListener('click', () => openRegisterModal());
+    dom.showRegister?.addEventListener('click', event => {
+      event.preventDefault();
+      openRegisterModal();
+    });
     dom.showLogin?.addEventListener('click', () => {
       closeRegisterModal();
       dom.loginEmail?.focus();
