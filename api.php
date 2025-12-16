@@ -122,9 +122,14 @@ function handle_register(): void {
     if (strlen($password) < 6) respond(400, ['error' => 'Passwort zu kurz']);
 
     $pdo = get_pdo();
-    $stmt = $pdo->prepare('SELECT id FROM users WHERE email = :email');
-    $stmt->execute(['email' => $email]);
-    if ($stmt->fetch()) respond(409, ['error' => 'E-Mail bereits registriert']);
+    $stmt = $pdo->prepare('SELECT name, email FROM users WHERE email = :email OR name = :name LIMIT 1');
+    $stmt->execute(['email' => $email, 'name' => $name]);
+    $existing = $stmt->fetch();
+    if ($existing) {
+        if (strcasecmp($existing['email'], $email) === 0) respond(409, ['error' => 'E-Mail bereits registriert']);
+        if (strcasecmp($existing['name'], $name) === 0) respond(409, ['error' => 'Benutzername bereits vergeben']);
+        respond(409, ['error' => 'Benutzername oder E-Mail bereits vergeben']);
+    }
 
     $passwordHash = password_hash($password, PASSWORD_DEFAULT);
     $stmt = $pdo->prepare('INSERT INTO users (name, email, password_hash) VALUES (:name, :email, :pw)');
