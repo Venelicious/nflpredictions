@@ -21,7 +21,41 @@
     <div class="logo">NFL Predictions</div>
 
     <div id="authArea" class="auth-area">
-      <!-- Login / Register Forms kommen später rein -->
+      <form id="loginForm" class="auth-form" autocomplete="on">
+        <input id="loginEmail" type="email" placeholder="E-Mail" required />
+        <input id="loginPassword" type="password" placeholder="Passwort" required />
+        <button type="submit">Login</button>
+        <p id="loginStatus" class="helper status"></p>
+        <p class="helper">
+          Neu hier?
+          <button id="showRegister" type="button" class="linkish">Registrieren</button>
+        </p>
+      </form>
+
+      <form id="registerForm" class="auth-form hidden" autocomplete="on">
+        <input id="registerName" type="text" placeholder="Name" required />
+        <input id="registerEmail" type="email" placeholder="E-Mail" required />
+        <input
+          id="registerPassword"
+          type="password"
+          placeholder="Passwort (mind. 6 Zeichen)"
+          required
+        />
+        <button type="submit">Registrieren</button>
+        <p id="registerStatus" class="helper status"></p>
+        <p class="helper">
+          Bereits dabei?
+          <button id="showLogin" type="button" class="linkish">Zum Login</button>
+        </p>
+      </form>
+
+      <div id="welcomeBox" class="welcome hidden">
+        <div>
+          <p id="welcomeNameHeader" class="welcome__name"></p>
+          <p id="welcomeEmailHeader" class="welcome__email"></p>
+        </div>
+        <button id="logoutBtn" class="secondary danger">Logout</button>
+      </div>
     </div>
   </header>
 
