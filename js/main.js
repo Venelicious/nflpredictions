@@ -1,6 +1,8 @@
 // main.js
 import { auth } from './features/auth.js';
 import { dom } from './ui/dom.js';
+import { authUI } from './ui/authUI.js';
+import { initTabs } from './ui/tabs.js';
 import { renderScoreboard } from './ui/renderScoreboard.js';
 import { renderPredictions } from './ui/renderPredictions.js';
 import { renderStats } from './ui/renderStats.js';
@@ -9,10 +11,15 @@ import { defaultPredictions, normalizePrediction } from './features/predictions.
 import { apiClient } from './api/apiClient.js';
 
 let standingsSnapshot = null;
+let tabs;
 
 async function init() {
-  setupAuthForms();
-  setupTabs();
+  tabs = initTabs();
+  authUI.bind({
+    onLoginSubmit,
+    onRegisterSubmit,
+    onLogout,
+  });
   setupPredictionInteractions();
 
   await auth.init();
@@ -20,53 +27,13 @@ async function init() {
   loadStandings();
 }
 
-function setupTabs() {
-  const buttons = Array.from(document.querySelectorAll('.tab-button'));
-  const panes = Array.from(document.querySelectorAll('.tab-pane'));
-
-  buttons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const target = btn.dataset.tab;
-      buttons.forEach(b => b.classList.toggle('active', b.dataset.tab === target));
-      panes.forEach(p => p.classList.toggle('active', p.id === target));
-    });
-  });
-}
-
-function setupAuthForms() {
-  dom.showRegister?.addEventListener('click', () => toggleAuthForm('register'));
-  dom.showLogin?.addEventListener('click', () => toggleAuthForm('login'));
-
-  dom.loginForm?.addEventListener('submit', onLoginSubmit);
-  dom.registerForm?.addEventListener('submit', onRegisterSubmit);
-  dom.logoutBtn?.addEventListener('click', onLogout);
-}
-
 function setupPredictionInteractions() {
   dom.predictionsContent?.addEventListener('input', onPredictionInput);
   dom.savePredictions?.addEventListener('click', onSavePredictions);
 }
 
-function toggleAuthForm(mode) {
-  const toLogin = mode === 'login';
-  dom.loginForm?.classList.toggle('hidden', !toLogin);
-  dom.registerForm?.classList.toggle('hidden', toLogin);
-  dom.authArea?.classList.toggle('auth-area--logged-in', false);
-}
-
-function setStatus(el, message, isError = false) {
-  if (!el) return;
-  el.textContent = message || '';
-  el.classList.toggle('error', isError);
-}
-
-function setFormDisabled(formEl, disabled) {
-  if (!formEl) return;
-  formEl.querySelectorAll('input, button').forEach(el => { el.disabled = disabled; });
-}
-
-async function onLoginSubmit(event) {
-  event.preventDefault();
+async function onLoginSubmit(_event, helpers) {
+  const { setStatus, setFormDisabled } = helpers;
   setStatus(dom.loginStatus, '');
   setFormDisabled(dom.loginForm, true);
 
@@ -81,8 +48,8 @@ async function onLoginSubmit(event) {
   }
 }
 
-async function onRegisterSubmit(event) {
-  event.preventDefault();
+async function onRegisterSubmit(_event, helpers) {
+  const { setStatus, setFormDisabled } = helpers;
   setStatus(dom.registerStatus, '');
   setFormDisabled(dom.registerForm, true);
 
@@ -114,30 +81,18 @@ function loadStandings() {
       standingsSnapshot = extractStandings(data);
       render();
     })
-    .catch(() => setStatus(dom.registerStatus, 'Konnte Standings nicht laden', true));
+    .catch(() => authUI.setStatus(dom.registerStatus, 'Konnte Standings nicht laden', true));
 }
 
 function updateAuthUI() {
   const user = auth.getUser(auth.currentUser);
   const isLoggedIn = Boolean(user);
 
-  dom.authArea?.classList.toggle('auth-area--logged-in', isLoggedIn);
-  dom.welcomeBox?.classList.toggle('hidden', !isLoggedIn);
-  dom.welcomeArea?.classList.toggle('hidden', !isLoggedIn);
-  dom.tabs?.classList.toggle('hidden', !isLoggedIn);
-  dom.loginForm?.classList.toggle('hidden', isLoggedIn);
-  dom.registerForm?.classList.toggle('hidden', true);
+  authUI.renderUser(user);
+  tabs?.setVisible(isLoggedIn);
 
-  if (isLoggedIn) {
-    dom.headerWelcomeName.textContent = user.name || 'Coach';
-    dom.headerWelcomeEmail.textContent = user.email;
-    dom.welcomeName.textContent = user.name || 'Coach';
-    dom.welcomeEmail.textContent = user.email;
-  } else {
-    setStatus(dom.loginStatus, '');
-    setStatus(dom.registerStatus, '');
-    dom.loginForm?.reset();
-    dom.registerForm?.reset();
+  if (!isLoggedIn) {
+    tabs?.activate('predictionsTab');
   }
 }
 
@@ -151,13 +106,24 @@ function render() {
 
   if (user) {
     renderPredictions(dom.predictionsContent, predictions);
+    authUI.setStatus(dom.predictionStatus, '');
+    dom.overviewStatus.textContent = '';
+  } else {
+    dom.predictionsContent.innerHTML = '<p class="hint">Bitte einloggen, um deine Tipps zu sehen.</p>';
+    authUI.setStatus(dom.predictionStatus, '');
+    dom.overviewStatus.textContent = 'Melde dich an, um das Scoreboard zu sehen.';
   }
 
-  renderScoreboardView();
+  renderScoreboardView(Boolean(user));
   renderStats(dom.statsContent, standingsSnapshot);
 }
 
-function renderScoreboardView() {
+function renderScoreboardView(isLoggedIn) {
+  if (!isLoggedIn) {
+    dom.overviewContent.innerHTML = '';
+    return;
+  }
+
   renderScoreboard({
     container: dom.overviewContent,
     participants: auth.users,
@@ -205,7 +171,7 @@ async function onSavePredictions() {
 
   const predictions = user.predictionsBySeason?.[auth.season] || defaultPredictions();
 
-  setStatus(dom.predictionStatus, 'Speichere ...');
+  authUI.setStatus(dom.predictionStatus, 'Speichere ...');
   dom.savePredictions.disabled = true;
 
   try {
@@ -213,9 +179,9 @@ async function onSavePredictions() {
       season: auth.season,
       payload: predictions,
     });
-    setStatus(dom.predictionStatus, 'Gespeichert');
+    authUI.setStatus(dom.predictionStatus, 'Gespeichert');
   } catch (err) {
-    setStatus(dom.predictionStatus, err.message || 'Konnte nicht speichern', true);
+    authUI.setStatus(dom.predictionStatus, err.message || 'Konnte nicht speichern', true);
   } finally {
     dom.savePredictions.disabled = false;
   }

@@ -21,10 +21,15 @@ export const dom = {
   welcomeName: document.getElementById('welcomeName'),
   welcomeEmail: document.getElementById('welcomeEmail'),
   tabs: document.getElementById('tabs'),
+  tabButtons: document.querySelectorAll('.tab-button'),
+  tabPanes: document.querySelectorAll('.tab-pane'),
+
+  predictionStatus: document.getElementById('predictionStatus'),
 
   predictionsContent: document.getElementById('predictionsContent'),
   statsContent: document.getElementById('statsContent'),
   overviewContent: document.getElementById('overviewContent'),
+  overviewStatus: document.getElementById('overviewStatus'),
 
   savePredictions: document.getElementById('savePredictions'),
   seasonPicker: document.getElementById('seasonPicker'),
