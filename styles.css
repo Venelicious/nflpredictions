@@ -587,10 +587,14 @@ button { font-family: inherit; }
   border: 1px solid rgba(12, 159, 111, 0.5);
 }
 
-
-
-.overview-scoreboard::-webkit-scrollbar {
-  height: 6px;
+.overview-scoreboard {
+  margin-bottom: 16px;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  background: #fff;
+  padding: 12px;
+  overflow-x: auto;
 }
 
 .overview-scoreboard--export { overflow: visible; }
@@ -617,7 +621,7 @@ button { font-family: inherit; }
   width: 100%;
   border-collapse: separate;
   border-spacing: 10px;
-  min-width: max-content !important;
+  min-width: 640px;
 }
 
 .scoreboard__cell {
@@ -674,16 +678,6 @@ button { font-family: inherit; }
 .scoreboard__bonus-label { font-weight: 800; }
 .scoreboard__bonus-hint { font-size: 12px; color: var(--gray-500); }
 
-
-
-
-
-/* -------------------------------------------- */
-/* SCOREBOARD HEADER fixed horizontal alignment */
-/* -------------------------------------------- */
-
-
-
 .print-sheet {
   background: #fff;
   border: 1px solid var(--gray-200);
@@ -710,7 +704,7 @@ button { font-family: inherit; }
 .print-sheet__meta,
 .print-sheet__players { margin: 2px 0 0; color: #4b5563; font-size: 14px; }
 
-.print-sheet 
+.print-sheet .overview-scoreboard { overflow: visible; box-shadow: none; }
 
 @page {
   size: A4 landscape;
@@ -766,114 +760,322 @@ footer {
   .tab-nav { flex-direction: column; }
 }
 
-/* ============================= */
-/* CLEAN SCOREBOARD FIXES (v2)   */
-/* ============================= */
 
-/* Header stays horizontal */
-.overview-scoreboard {
-  margin-bottom: 16px;
-  border: 1px solid var(--gray-200);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  background: #fff;
-  padding: 12px;
-  overflow-x: auto !important;
-  -webkit-overflow-scrolling: touch !important;
-}
+/* ============================================================
+   PREMIUM SCOREBOARD EXTENSIONS
+   ============================================================ */
 
-.scoreboard__header-row {
-  display: grid !important;
-  grid-template-columns: var(--scoreboard-columns) !important;
-  align-items: center;
-  min-width: max-content !important;
-}
-
-/* Divisions vertically stacked */
-.scoreboard-grid {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 20px !important;
-  width: 100%;
-}
-
-/* Prevent collapse + enable scroll width */
-.scoreboard {
-  min-width: max-content !important;
-  width: 100%;
-}
-
-.scoreboard__bonus-row {
-  display: grid !important;
-  grid-template-columns: var(--scoreboard-columns) !important;
-  min-width: max-content !important;
-}
-
-/* Ensure cells don't stretch weirdly */
-.scoreboard__cell {
-  white-space: normal !important;
-}
-
-/* Mobile improvements */
-@media (max-width: 540px) {
-  .scoreboard__team-row img {
-    width: 22px !important;
-    height: 22px !important;
-  }
-}
-
-.scoreboard-division-block {
-  margin-bottom: 22px;
-}
-
-.scoreboard-division-grid {
+/* -------------------------------
+   PREMIUM SCOREBOARD ROW LAYOUT
+--------------------------------*/
+.scoreboard__row--premium {
   display: grid;
-  grid-auto-flow: column;
-  grid-gap: 12px;
-  width: max-content;
+  grid-template-columns: minmax(210px, 1.4fr) repeat(auto-fit, minmax(150px, 1fr));
+  align-items: stretch;
+  gap: 12px;
+  padding: 6px 0;
 }
 
-.scoreboard-division-col {
+/* Left = Standings cell, Right = User cells */
+.scoreboard__cell--actual,
+.scoreboard__cell--prediction {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 4px;
+  background: #fff;
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  padding: 8px 10px;
+  box-shadow: var(--shadow);
 }
 
-.scoreboard-team-compact {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 4px 6px;
-  border-bottom: 1px solid var(--gray-200);
-}
-
-.team-left,
-.team-right {
+/* Premium team row style */
+.scoreboard__team-row--actual,
+.scoreboard__team-row--predicted {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
 }
 
-.team-icon {
-  width: 22px;
-  height: 22px;
-}
-
-.rank {
+/* Alias only (compact) */
+.scoreboard__team-row--actual .team-name,
+.scoreboard__team-row--predicted .team-name {
   font-weight: 700;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.alias {
-  font-weight: 700;
+/* Smaller logos inside scoreboard */
+.scoreboard__row--premium .team-logo {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
 }
 
-.team-record,
-.pred-record {
+/* Record compact style */
+.scoreboard__record {
   font-size: 13px;
+  font-weight: 600;
   color: var(--gray-500);
 }
 
-.team-points {
+.scoreboard__team-points {
+  font-weight: 700;
+  color: var(--navy-2);
+  font-size: 13px;
+}
+
+
+/* ============================================================
+   DIVISION BANNERS (NFL STYLE – Option A)
+   ============================================================ */
+
+/* Generic banner */
+.scoreboard__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 13px;
   font-weight: 800;
-  color: var(--navy-3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 12px;
+}
+
+/* AFC RED */
+.scoreboard__title--afc {
+  background: rgba(200, 16, 46, 0.08);
+  border: 1px solid rgba(200, 16, 46, 0.35);
+  color: #c8102e;
+}
+
+/* NFC BLUE */
+.scoreboard__title--nfc {
+  background: rgba(19, 32, 56, 0.1);
+  border: 1px solid rgba(19, 32, 56, 0.35);
+  color: #132038;
+}
+
+/* Conference + Division */
+.scoreboard__title-conference {
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.scoreboard__title-division {
+  opacity: 0.85;
+  font-weight: 700;
+}
+
+
+/* ============================================================
+   BONUS ROW – Compact Modern Style
+   ============================================================ */
+
+.scoreboard__bonus-row {
+  display: grid;
+  grid-template-columns: var(--scoreboard-columns);
+  gap: 10px;
+  margin: 4px 0 12px;
+  align-items: center;
+  font-size: 12px;
+}
+
+.scoreboard__cell--info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.scoreboard__bonus-label {
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--gray-600);
+}
+
+.scoreboard__bonus-hint {
+  font-size: 10px;
+  color: var(--gray-400);
+}
+
+.scoreboard__cell--bonus {
+  display: flex;
+  justify-content: center;
+  background: transparent !important;
+  border: none !important;
+  padding: 0;
+}
+
+/* BONUS CHIP STYLING */
+.bonus-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px dashed var(--gray-300);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gray-600);
+  background: transparent;
+}
+
+.bonus-chip--active {
+  border: 1px solid #0c9f6f;
+  background: rgba(12, 159, 111, 0.12);
+  color: #0c9f6f;
+}
+
+
+/* ============================================================
+   MOBILE OPTIMIZATION
+   ============================================================ */
+
+@media (max-width: 640px) {
+  .scoreboard__row--premium {
+    gap: 6px;
+    grid-template-columns: minmax(160px, 1.2fr) repeat(auto-fit, minmax(110px, 1fr));
+  }
+
+  .scoreboard__title {
+    font-size: 12px;
+    padding: 4px 10px;
+  }
+
+  .bonus-chip__caption {
+    display: none; /* chips only */
+  }
+}
+
+/* --- SCOREBOARD GLOBAL --- */
+.scoreboard-matrix {
+  --col-gap: 12px;
+  --row-gap: 6px;
+  margin-top: 20px;
+}
+
+/* Division Banner */
+.division-banner {
+  background: linear-gradient(90deg, #102040, #1c335c);
+  color: #fff;
+  padding: 8px 14px;
+  border-radius: 8px;
+  margin: 18px 0 12px;
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.division-banner--afc {
+  background: linear-gradient(90deg, #8b1f1f, #b83232);
+}
+
+.division-banner--nfc {
+  background: linear-gradient(90deg, #0a3d7a, #1564b0);
+}
+
+/* Banner Text */
+.division-banner .banner-conf {
+  font-size: 0.85rem;
+  opacity: 0.9;
+}
+
+.division-banner .banner-div {
+  font-size: 1rem;
+}
+
+/* --- GRID LAYOUT --- */
+.scoreboard-grid--matrix {
+  display: grid;
+  gap: var(--row-gap);
+}
+
+.scoreboard__row--matrix {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 8px 4px;
+  align-items: center;
+}
+
+/* ACTUAL STANDINGS CELL */
+.cell-standings {
+  background: #f6f7f9;
+  padding: 10px;
+  border-radius: 10px;
+}
+
+/* USER PREDICTION CELL */
+.prediction-compact {
+  background: #ffffff;
+  padding: 10px;
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 10%);
+}
+
+/* TEAM NAME + LOGO INLINE */
+.scoreboard__team-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.scoreboard__rank {
+  font-weight: 700;
+  opacity: 0.8;
+}
+
+.team-alias {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+/* RECORD UND PUNKTE */
+.scoreboard__record {
+  font-size: 0.85rem;
+  color: #4b5563;
+  margin-top: 2px;
+}
+
+.team-points {
+  font-size: 0.8rem;
+  font-weight: 700;
+  margin-top: 4px;
+  color: #1e3a8a;
+}
+
+/* --- BONUS ROW --- */
+.bonus-compact {
+  text-align: center;
+  padding: 6px 0;
+}
+
+.bonus-chip {
+  display: inline-block;
+  background: #e5e7eb;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  color: #374151;
+}
+
+.bonus-chip--active {
+  background: #16a34a;
+  color: white;
+}
+
+.bonus-chip__caption {
+  font-size: 0.7rem;
+  opacity: 0.7;
 }
