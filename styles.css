@@ -804,8 +804,6 @@ footer {
   font-size: 14px;
 }
 
-.hidden { display: none !important; }
-
 @media (max-width: 540px) {
   .prediction-row { gap: 8px; }
   .stat-row__team { gap: 8px; }
@@ -880,13 +878,13 @@ footer {
 }
 
 /* Record compact style */
-.scoreboard__record {
+.scoreboard__row--premium .scoreboard__record {
   font-size: 13px;
   font-weight: 600;
   color: var(--gray-500);
 }
 
-.scoreboard__team-points {
+.scoreboard__row--premium .scoreboard__team-points {
   font-weight: 700;
   color: var(--navy-2);
   font-size: 13px;
@@ -1088,31 +1086,31 @@ footer {
 }
 
 /* TEAM NAME + LOGO INLINE */
-.scoreboard__team-row {
+.scoreboard-grid--matrix .scoreboard__team-row {
   display: flex;
   align-items: center;
   gap: 8px;
   font-weight: 600;
 }
 
-.scoreboard__rank {
+.scoreboard-grid--matrix .scoreboard__rank {
   font-weight: 700;
   opacity: 0.8;
 }
 
-.team-alias {
+.scoreboard-grid--matrix .team-alias {
   font-size: 0.95rem;
   font-weight: 600;
 }
 
 /* RECORD UND PUNKTE */
-.scoreboard__record {
+.scoreboard-grid--matrix .scoreboard__record {
   font-size: 0.85rem;
   color: #4b5563;
   margin-top: 2px;
 }
 
-.team-points {
+.scoreboard-grid--matrix .team-points {
   font-size: 0.8rem;
   font-weight: 700;
   margin-top: 4px;
@@ -1125,7 +1123,7 @@ footer {
   padding: 6px 0;
 }
 
-.bonus-chip {
+.bonus-compact .bonus-chip {
   display: inline-block;
   background: #e5e7eb;
   padding: 4px 10px;
@@ -1134,12 +1132,12 @@ footer {
   color: #374151;
 }
 
-.bonus-chip--active {
+.bonus-compact .bonus-chip--active {
   background: #16a34a;
   color: white;
 }
 
-.bonus-chip__caption {
+.bonus-compact .bonus-chip__caption {
   font-size: 0.7rem;
   opacity: 0.7;
 }
